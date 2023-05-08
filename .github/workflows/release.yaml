@@ -63,6 +63,7 @@ jobs:
 
       - uses: whelk-io/maven-settings-xml-action@v20
         with:
+          output_file: /home/runner/.m2/settings-security.xml
           servers: >
             [
               {
