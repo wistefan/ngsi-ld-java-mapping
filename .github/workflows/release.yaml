@@ -53,7 +53,7 @@ jobs:
       - uses: crazy-max/ghaction-import-gpg@v5
         with:
           gpg_private_key: ${{ secrets.GPG_SECRET_KEY }}
-          passphrase: ${{ secrets.GPG_SECRET_KEY_PASSPHRASE }}
+          passphrase: ${{ secrets.GPG_SECRET_KEY_PASSWORD }}
           git_user_signingkey: true
           git_commit_gpgsign: true
 
@@ -66,10 +66,8 @@ jobs:
           mvn clean test jacoco:report coveralls:report -Dcoveralls.token=${{ secrets.COVERALLS_TOKEN }}
 
       - name: Build and release it
-        env:
-          GPG_PASSPHRASE :  ${{ secrets.GPG_SECRET_KEY_PASSPHRASE }}
         run: |
-          mvn install deploy -Prelease -Dgpg.passphrase=${{ secrets.GPG_SECRET_KEY_PASSPHRASE }} -Dgpg.keyname=CA3E866107F37078
+          mvn install deploy -Prelease -Dgpg.passphrase=${{ secrets.GPG_SECRET_KEY_PASSWORD }} -Dgpg.keyname=CA3E866107F37078
 
 
   git-release:
