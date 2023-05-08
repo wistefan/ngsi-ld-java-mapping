@@ -60,6 +60,8 @@
         <project.vendor>FIWARE Foundation, e.V.</project.vendor>
         <project.contact.domain>fiware.org</project.contact.domain>
         <project.contact.email>stefan.wiedemann@fiware.org</project.contact.email>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
         <!-- lazy dev -->
         <version.org.mapstruct>1.4.2.Final</version.org.mapstruct>
