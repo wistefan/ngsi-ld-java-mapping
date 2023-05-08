@@ -65,3 +65,22 @@ jobs:
       - name: Build and release it
         run: |
           mvn install deploy -Prelease -Dgpg.passphrase=${{ secrets.GPG_SECRET_KEY_PASSPHRASE }} -Dgpg.keyname=CA3E866107F37078
+
+
+  git-release:
+    needs: ["generate-version", "build-and-deploy"]
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/checkout@v2
+
+      - uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: ${{ needs.generate-version.outputs.version }}
+          prerelease: false
+          title: ${{ needs.generate-version.outputs.version }}
+          files: |
+            LICENSE
