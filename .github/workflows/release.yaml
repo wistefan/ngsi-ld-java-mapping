@@ -56,8 +56,6 @@ jobs:
         with:
           java-version: '17'
           java-package: jdk
-          cache :  maven
-          server-id: sonatype-nexus
           server-username: SERVER_USERNAME
           server-password: SERVER_PASSWORD
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
