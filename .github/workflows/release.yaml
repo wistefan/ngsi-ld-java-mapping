@@ -73,6 +73,10 @@ jobs:
               }
             ]
 
+      - name: log
+        run: | 
+          cat /home/runner/.m2/settings-security.xml
+
       - name: Set version
         run: |
           mvn versions:set -DnewVersion=${{ needs.generate-version.outputs.version }}
