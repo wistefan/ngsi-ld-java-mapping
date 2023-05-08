@@ -67,11 +67,11 @@ jobs:
             [
               {
                 "id": "sonatype-nexus",
-                "username": "${{ secrets.SERVER_USERNAME }}",
-                "password": " ${{ secrets.SERVER_PASSWORD }}"
+                "username": "${secrets.SERVER_USERNAME}",
+                "password": " ${secrets.SERVER_PASSWORD}"
               }
             ]
-            
+
       - name: Set version
         run: |
           mvn versions:set -DnewVersion=${{ needs.generate-version.outputs.version }}
