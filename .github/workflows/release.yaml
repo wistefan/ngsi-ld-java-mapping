@@ -56,10 +56,6 @@ jobs:
         with:
           java-version: '17'
           java-package: jdk
-          server-username: SERVER_USERNAME
-          server-password: SERVER_PASSWORD
-          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
-          gpg-passphrase: GPG_PASSPHRASE
 
       - name: Set version
         run: |
@@ -69,9 +65,12 @@ jobs:
         run: |
           mvn clean test jacoco:report coveralls:report -Dcoveralls.token=${{ secrets.COVERALLS_TOKEN }}
 
+      - name: List keys
+        run: gpg -K
+
       - name: Build and release it
         run: |
-          mvn install deploy -Prelease -Dgpg.passphrase=${{ secrets.GPG_SECRET_KEY_PASSWORD }} -Dgpg.keyname=CA3E866107F37078
+          mvn install deploy -Prelease -Dgpg.passphrase='${{ secrets.GPG_SECRET_KEY_PASSWORD }}' -Dgpg.keyname=CA3E866107F37078
 
 
   git-release:
