@@ -16,7 +16,7 @@ provided, that needs to be used for describing the object mappings.
 In order to enable the mappers to translate correctly between both worlds, the domain object has to be annotated properly.
 
 > :bulb: All examples have a test running the described scenario. You should look up all the details there.
-> The tests can be found under the [test-folder](src/test/java/org/fiware/tmforum/mapping/desc/), the ```DisplayName``` corresponds
+> The tests can be found under the [test-folder](src/test/java/io/github/wistefan/mapping/desc/), the ```DisplayName``` corresponds
 > with the example name referenced in the :mag: block.
 
 ### Simple example
@@ -24,7 +24,7 @@ In order to enable the mappers to translate correctly between both worlds, the d
 
 Lets start with a simple example:
 
-> :mag: [JavaObjectMapperTest](src/test/java/org/fiware/tmforum/mapping/desc/JavaObjectMapperTest.java) - Simple pojo mapping.
+> :mag: [JavaObjectMapperTest](src/test/java/io/github/wistefan/mapping/desc/JavaObjectMapperTest.java) - Simple pojo mapping.
 
 ```java
 @MappingEnabled(value = "my-pojo")
@@ -126,7 +126,7 @@ The mapping-module intends to support complex data-structures and the usage of m
 
 When an individual object is used inside the entity, it can be embedded as a property:
 
-> :mag: [JavaObjectMapperTest](src/test/java/org/fiware/tmforum/mapping/desc/JavaObjectMapperTest.java) - Map Pojo with a field that is an object.
+> :mag: [JavaObjectMapperTest](src/test/java/io/github/wistefan/mapping/desc/JavaObjectMapperTest.java) - Map Pojo with a field that is an object.
 ```java
 @Data
 public class MySubProperty {
@@ -169,7 +169,7 @@ The sub-property will be translated into a plain json-object:
 ```
 
 The sub-property also can be a list of objects, too:
-> :mag: [JavaObjectMapperTest](src/test/java/org/fiware/tmforum/mapping/desc/JavaObjectMapperTest.java) - Map Pojo with a field that is a list of objects.
+> :mag: [JavaObjectMapperTest](src/test/java/io/github/wistefan/mapping/desc/JavaObjectMapperTest.java) - Map Pojo with a field that is a list of objects.
 ```java
 @Getter(onMethod = @__({@AttributeGetter(value = AttributeType.PROPERTY_LIST, targetName = "mySubProperty")}))
 @Setter(onMethod = @__({@AttributeSetter(value = AttributeType.PROPERTY_LIST, targetName = "mySubProperty", targetClass = MySubProperty.class)}))
@@ -203,7 +203,7 @@ Note that the setter-annotation now has to contain the value ```targetClass``` t
 NGSI-LD is a lot about relating entities. For objects, we typically want the same. Therefor the [AttributeType's](src/main/java/io/github/wistefan/mapping/annotations/AttributeType.java) ```RELATIONSHIP``` and ```RELATIONSHIP_LIST``` exist.
 In the most simple example, the object defined as a sub-property can be another entity:
 
-> :mag: [JavaObjectMapperTest](src/test/java/org/fiware/tmforum/mapping/desc/JavaObjectMapperTest.java) - Map Pojo with a field that is a relationship.
+> :mag: [JavaObjectMapperTest](src/test/java/io/github/wistefan/mapping/desc/JavaObjectMapperTest.java) - Map Pojo with a field that is a relationship.
 ```java
 @MappingEnabled(entityType = "sub-entity")
 public class MySubPropertyEntity {
@@ -253,7 +253,7 @@ The resulting object looks as following:
 
 In order to provide properties of a relationship, the ```embedProperty``` field of the [@AttributeGetter](src/main/java/io/github/wistefan/mapping/annotations/AttributeGetter.java) can be used. It adds the field to the object:
 The sub-entity contains another field:
-> :mag: [JavaObjectMapperTest](src/test/java/org/fiware/tmforum/mapping/desc/JavaObjectMapperTest.java) - Map Pojo with a field that is a relationship with additional attributes.
+> :mag: [JavaObjectMapperTest](src/test/java/io/github/wistefan/mapping/desc/JavaObjectMapperTest.java) - Map Pojo with a field that is a relationship with additional attributes.
 ```java
 @Getter(onMethod = @__({@AttributeGetter(value = AttributeType.PROPERTY, targetName = "role", embedProperty = true)}))
 @Setter(onMethod = @__({@AttributeSetter(value = AttributeType.PROPERTY, targetName = "role")}))
@@ -285,7 +285,7 @@ to retrieve the actual entities related from NGSI-LD.
 > :warning: In order to use that feature, referential integrity has to be assured. The referenced entities need to be provided through the repository-interface.
  
 In case of the previous example: 
-> :mag: [EntityVOMapperTest](src/test/java/org/fiware/tmforum/mapping/desc/EntityVOMapperTest.java) - Map entity containing a relationship.
+> :mag: [EntityVOMapperTest](src/test/java/io/github/wistefan/mapping/desc/EntityVOMapperTest.java) - Map entity containing a relationship.
 ```json
 {
 	"@context": "https://smartdatamodels.org/context.jsonld",
@@ -312,7 +312,7 @@ The entity ```urn:ngsi-ld:sub-entity:the-sub-entity``` also has to exist within 
 ```
 The mapper will then retrieve all entites referenced as a relationship from the repository and generate the defined objects.
 Remember the annotation-value ```targetClass```, it will be used to map the referenced entity to the target type:
-> :mag: [EntityVOMapperTest](src/test/java/org/fiware/tmforum/mapping/desc/EntityVOMapperTest.java) - Map entity containing a relationship with embedded values.
+> :mag: [EntityVOMapperTest](src/test/java/io/github/wistefan/mapping/desc/EntityVOMapperTest.java) - Map entity containing a relationship with embedded values.
 ```java
 	@Setter(onMethod = @__({@AttributeSetter(value = AttributeType.RELATIONSHIP, targetName = "sub-entity", targetClass = MySubPropertyEntity.class)}))
 	private MySubPropertyEntity mySubProperty;
@@ -367,10 +367,4 @@ The result is an object, containing values from the parent and the actual entity
 	}
 }
 ```
-
-
-## Referential integrity
-
-The mapping itself does not handle referential-integrity checks. However, the [common-module](../common) offers such functionality.
-
 
