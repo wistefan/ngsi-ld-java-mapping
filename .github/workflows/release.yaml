@@ -56,6 +56,10 @@ jobs:
         with:
           java-version: '17'
           java-package: jdk
+          cache: maven
+          server-id: sonatype-nexus
+          server-username:  ${{ secrets.SERVER_USERNAME }}
+          server-password: ${{ secrets.SERVER_PASSWORD }}
 
       - name: Set version
         run: |
