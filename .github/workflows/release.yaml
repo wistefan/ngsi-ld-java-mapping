@@ -60,7 +60,7 @@ jobs:
       - uses: whelk-io/maven-settings-xml-action@v20
         with:
           output_file: /home/runner/.m2/settings-security.xml
-          servers: '[{ "id": "sonatype-nexus", "username": "${{ secrets.SERVER_USERNAME }}", "password": "${{ secrets.SERVER_PASSWORD }}" }]'
+          servers: '[{ "id": "sonatype-nexus", "username": "${env.SERVER_USERNAME}", "password": "${env.SERVER_PASSWORD}" }]'
 
       - name: log
         run: | 
@@ -78,6 +78,9 @@ jobs:
         run: gpg -K
 
       - name: Build and release it
+        env:
+          SERVER_USERNAME: ${{ secrets.SERVER_USERNAME }}
+          SERVER_PASSWORD: ${{ secrets.SERVER_PASSWORD }}
         run: |
           mvn install deploy -Prelease -Dgpg.passphrase='${{ secrets.GPG_SECRET_KEY_PASSWORD }}' -Dgpg.keyname=CA3E866107F37078
 
