@@ -57,8 +57,8 @@ jobs:
           java-version: '17'
           java-package: jdk
           server-id: sonatype-nexus
-          server-username: ${{ secrets.SERVER_USERNAME }}
-          server-password: ${{ secrets.SERVER_PASSWORD }}
+          server-username: "${env.SERVER_USERNAME}"
+          server-password: "${env.SERVER_PASSWORD}"
 
       - uses: whelk-io/maven-settings-xml-action@v20
         with:
