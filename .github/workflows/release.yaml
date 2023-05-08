@@ -80,7 +80,7 @@ jobs:
           SERVER_PASSWORD: ${{ secrets.SERVER_PASSWORD }}
           GPG_PASSPHRASE: ${{ secrets.GPG_SECRET_KEY_PASSWORD }}
         run: |
-          mvn install deploy -Prelease
+          mvn install deploy -Prelease -Dgpg.keyname=CA3E866107F37078
 
 
   git-release:
