@@ -1,6 +1,12 @@
-# Mapping between Java-Objects and NGSI-LD entities
+# NGSI-LD-Java-Mapping
 
-In order to integrate Service-APIs and there data-models with the NGSI-LD API, a mapping mechanism between the two worlds is required. This mapping module intents to provide that. Similar to other mapping mechanisms
+[![License badge](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/io.github.wistefan/ngsi-ld-java-mapping/badge.svg)](https://maven-badges.herokuapp.com/maven-central/io.github.wistefan/ngsi-ld-java-mapping/badge.svg)
+[![](https://img.shields.io/badge/tag-fiware-orange.svg?logo=stackoverflow)](http://stackoverflow.com/questions/tagged/fiware)
+[![Coverage Status](https://coveralls.io/repos/github/wistefan/ngsi-ld-java-mapping/badge.svg?branch=main)](https://coveralls.io/github/wistefan/ngsi-ld-java-mapping?branch=init)
+[![Test](https://github.com/wistefan/ngsi-ld-java-mapping/actions/workflows/test.yaml/badge.svg)](https://github.com/wistefan/ngsi-ld-java-mapping/actions/workflows/test.yaml)
+
+In order to ease the integration of NGSI-LD into the application domain, a mapping mechanism between the two worlds is required. The NGSI-LD-java-mapping library is providing this. Similar to other mapping mechanisms
 like [jackson](https://github.com/FasterXML/jackson) for JSON-Java,
 [mapstruct](https://mapstruct.org/) for Java-Java or [Hibernate](https://hibernate.org/) for Java-Database, it uses an annotation-based approach. A set of specific [annotations](src/main/java/io/github/wistefan/mapping/annotations) is
 provided, that needs to be used for describing the object mappings.
