@@ -65,6 +65,7 @@ jobs:
 
       - name: Build and release it
         run: |
+          export GPG_TTY=$(tty)
           mvn install deploy -Prelease -Dgpg.passphrase=${{ secrets.GPG_SECRET_KEY_PASSPHRASE }} -Dgpg.keyname=CA3E866107F37078
 
 
