@@ -406,6 +406,14 @@
                     </dependency>
                 </dependencies>
             </plugin>
+            <plugin>
+                <groupId>org.eluder.coveralls</groupId>
+                <artifactId>coveralls-maven-plugin</artifactId>
+                <version>${version.org.eluder.coveralls.maven-plugin}</version>
+                <configuration>
+                    <repoToken>${coveralls.token}</repoToken>
+                </configuration>
+            </plugin>
             <!-- add generated sources -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
