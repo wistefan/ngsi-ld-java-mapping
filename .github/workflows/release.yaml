@@ -54,7 +54,6 @@ jobs:
           # Install gpg secret key
           cat <(echo -e "${{ secrets.GPG_SECRET_KEY }}") | gpg --batch --import
           
-
       - name: Set version
         run: |
           mvn versions:set -DnewVersion=${{ needs.generate-version.outputs.version }}
