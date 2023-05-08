@@ -56,22 +56,11 @@ jobs:
         with:
           java-version: '17'
           java-package: jdk
-          cache: maven
-          server-id:
-          server-username:
-          server-password:
 
       - uses: whelk-io/maven-settings-xml-action@v20
         with:
           output_file: /home/runner/.m2/settings-security.xml
-          servers: >
-            [
-              {
-                "id": "sonatype-nexus",
-                "username": "${secrets.SERVER_USERNAME}",
-                "password": " ${secrets.SERVER_PASSWORD}"
-              }
-            ]
+          servers:servers: '[{ "id": "sonatype-nexus", "username": "${{ secrets.SERVER_USERNAME }}", "password": "${{ secrets.SERVER_PASSWORD }}" }]'
 
       - name: log
         run: | 
