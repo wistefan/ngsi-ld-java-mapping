@@ -53,7 +53,7 @@ jobs:
         run: |
           # Install gpg secret key
           cat <(echo -e "${{ secrets.GPG_SECRET_KEY }}") | gpg --batch --import
-          
+
       - name: Set version
         run: |
           mvn versions:set -DnewVersion=${{ needs.generate-version.outputs.version }}
@@ -64,4 +64,4 @@ jobs:
 
       - name: Build and release it
         run: |
-          mvn install deploy -Prelease -gpg.passphrase=${{ secrets.GPG_SECRET_KEY_PASSPHRASE }} -gpg.keyname=CA3E866107F37078
+          mvn install deploy -Prelease -Dgpg.passphrase=${{ secrets.GPG_SECRET_KEY_PASSPHRASE }} -Dgpg.keyname=CA3E866107F37078
