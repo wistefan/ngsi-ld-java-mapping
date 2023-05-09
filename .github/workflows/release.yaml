@@ -99,4 +99,4 @@ jobs:
           prerelease: false
           title: ${{ needs.generate-version.outputs.version }}
           files: |
-            LICENSE
+            target/ngsi-ld-java-mapping-${{ needs.generate-version.outputs.version }}.jar
