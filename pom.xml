@@ -133,11 +133,13 @@
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <version>${version.org.projectlombok}</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.mapstruct</groupId>
             <artifactId>mapstruct</artifactId>
             <version>${version.org.mapstruct}</version>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>
@@ -150,19 +152,19 @@
             <groupId>javax.inject</groupId>
             <artifactId>javax.inject</artifactId>
             <version>${version.javax.inject}</version>
-            <scope>compile</scope>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>javax.annotation</groupId>
             <artifactId>javax.annotation-api</artifactId>
             <version>${version.javax.annotation-api}</version>
-            <scope>compile</scope>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.google.code.findbugs</groupId>
             <artifactId>jsr305</artifactId>
             <version>${version.com.google.code.findbugs.jsr305}</version>
-            <scope>compile</scope>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>jakarta.annotation</groupId>
@@ -192,6 +194,13 @@
             <groupId>io.micronaut</groupId>
             <artifactId>micronaut-http-client</artifactId>
             <version>${version.io.micronaut.micronaut-http-client}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.micronaut</groupId>
+            <artifactId>micronaut-http-client-core</artifactId>
+            <version>${version.io.micronaut.micronaut-http-client}</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
@@ -270,6 +279,11 @@
                             <artifactId>mapstruct-processor</artifactId>
                             <version>${version.org.mapstruct}</version>
                         </path>
+                        <path>
+                            <groupId>io.micronaut</groupId>
+                            <artifactId>micronaut-inject-java</artifactId>
+                            <version>${micronaut.version}</version>
+                        </path>
                     </annotationProcessorPaths>
                 </configuration>
                 <executions>
@@ -289,6 +303,11 @@
                                     <groupId>org.mapstruct</groupId>
                                     <artifactId>mapstruct-processor</artifactId>
                                     <version>${version.org.mapstruct}</version>
+                                </path>
+                                <path>
+                                    <groupId>io.micronaut</groupId>
+                                    <artifactId>micronaut-inject-java</artifactId>
+                                    <version>${micronaut.version}</version>
                                 </path>
                             </annotationProcessorPaths>
                         </configuration>
@@ -496,7 +515,7 @@
                                 </goals>
                             </execution>
                         </executions>
-                    </plugin> 
+                    </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-javadoc-plugin</artifactId>
