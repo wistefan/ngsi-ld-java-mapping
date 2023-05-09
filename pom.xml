@@ -79,6 +79,7 @@
         <version.javax.annotation-api>1.3.2</version.javax.annotation-api>
         <version.jakarta.annotation.jakarta.annotation-api>2.1.1</version.jakarta.annotation.jakarta.annotation-api>
         <version.io.micronaut.micronaut-core>3.9.1</version.io.micronaut.micronaut-core>
+        <version.io.micronaut.micronaut-http-client>3.9.1</version.io.micronaut.micronaut-http-client>
 
         <!-- json -->
         <version.com.fasterxml.jackson.core.jackson-databind>2.15.0
@@ -186,6 +187,11 @@
             <artifactId>micronaut-core</artifactId>
             <version>${version.io.micronaut.micronaut-core}</version>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.micronaut</groupId>
+            <artifactId>micronaut-http-client</artifactId>
+            <version>${version.io.micronaut.micronaut-http-client}</version>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
@@ -376,10 +382,10 @@
                         <configuration>
                             <inputSpec>${project.basedir}/api/broker-client.yaml</inputSpec>
                             <strictSpec>true</strictSpec>
+                            <apiPackage>org.fiware.ngsi.api</apiPackage>
                             <modelPackage>org.fiware.ngsi.model</modelPackage>
                             <generateAliasAsModel>true</generateAliasAsModel>
                             <generatorName>micronaut</generatorName>
-                            <generateApis>false</generateApis>
                             <generateApiTests>false</generateApiTests>
                             <modelNameSuffix>VO</modelNameSuffix>
                             <output>${project.build.directory}</output>
