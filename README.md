@@ -1,7 +1,7 @@
 # NGSI-LD-Java-Mapping
 
 [![License badge](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Maven Central](https://img.shields.io/maven-central/v/io.wistefan.github/ngsi-ld-java-mapping)](https://central.sonatype.com/artifact/io.github.wistefan/ngsi-ld-java-mapping/0.0.1)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.wistefan/ngsi-ld-java-mapping.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/io.github.wistefan/ngsi-ld-java-mapping)
 [![](https://img.shields.io/badge/tag-fiware-orange.svg?logo=stackoverflow)](http://stackoverflow.com/questions/tagged/fiware)
 [![Coverage Status](https://coveralls.io/repos/github/wistefan/ngsi-ld-java-mapping/badge.svg?branch=main)](https://coveralls.io/github/wistefan/ngsi-ld-java-mapping?branch=init)
 [![Test](https://github.com/wistefan/ngsi-ld-java-mapping/actions/workflows/test.yaml/badge.svg)](https://github.com/wistefan/ngsi-ld-java-mapping/actions/workflows/test.yaml)
