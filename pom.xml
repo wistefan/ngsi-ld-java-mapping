@@ -376,10 +376,10 @@
                         <configuration>
                             <inputSpec>${project.basedir}/api/broker-client.yaml</inputSpec>
                             <strictSpec>true</strictSpec>
+                            <apiPackage>org.fiware.ngsi.api</apiPackage>
                             <modelPackage>org.fiware.ngsi.model</modelPackage>
                             <generateAliasAsModel>true</generateAliasAsModel>
                             <generatorName>micronaut</generatorName>
-                            <generateApis>false</generateApis>
                             <generateApiTests>false</generateApiTests>
                             <modelNameSuffix>VO</modelNameSuffix>
                             <output>${project.build.directory}</output>
