@@ -98,5 +98,3 @@ jobs:
           automatic_release_tag: ${{ needs.generate-version.outputs.version }}
           prerelease: false
           title: ${{ needs.generate-version.outputs.version }}
-          files: |
-            target/ngsi-ld-java-mapping-${{ needs.generate-version.outputs.version }}.jar
