@@ -32,5 +32,5 @@ public class MySubPropertyEntity {
 
 	@Getter(onMethod = @__({@AttributeGetter(value = AttributeType.PROPERTY, targetName = "name")}))
 	@Setter(onMethod = @__({@AttributeSetter(value = AttributeType.PROPERTY, targetName = "name")}))
-	private String name = "myName";
+	private String myName = "myName";
 }

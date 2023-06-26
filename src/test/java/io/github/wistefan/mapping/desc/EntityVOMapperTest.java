@@ -194,7 +194,7 @@ class EntityVOMapperTest {
     @Test
     void ignoreUnmappedProperties() {
         MySubPropertyEntity mySubPropertyEntity = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:entity");
-        mySubPropertyEntity.setName("non-ignore");
+        mySubPropertyEntity.setMyName("non-ignore");
         EntityVO entityVO = new EntityVO().id(URI.create("urn:ngsi-ld:sub-entity:entity")).type("sub-entity");
         entityVO.setAdditionalProperties("non-prop", new PropertyVO().value("ignore"));
         entityVO.setAdditionalProperties("name", new PropertyVO().value("non-ignore"));
@@ -218,7 +218,7 @@ class EntityVOMapperTest {
         parentEntity.setAdditionalProperties("mySubProperty", subRel);
 
         MySubPropertyEntity expectedSub = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:entity");
-        expectedSub.setName("my-other-name");
+        expectedSub.setMyName("my-other-name");
         MyPojoWithSubEntityFrom expectedPojo = new MyPojoWithSubEntityFrom("urn:ngsi-ld:complex-pojo:entity");
         expectedPojo.setMySubProperty(expectedSub);
 
@@ -243,9 +243,9 @@ class EntityVOMapperTest {
         parentEntity.setAdditionalProperties("mySubProperty", relationshipVOS);
 
         MySubPropertyEntity expectedSub1 = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:entity-1");
-        expectedSub1.setName("sub-entity-1");
+        expectedSub1.setMyName("sub-entity-1");
         MySubPropertyEntity expectedSub2 = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:entity-2");
-        expectedSub2.setName("sub-entity-2");
+        expectedSub2.setMyName("sub-entity-2");
         MyPojoWithSubEntityListFrom expectedPojo = new MyPojoWithSubEntityListFrom("urn:ngsi-ld:complex-pojo:entity");
         expectedPojo.setMySubProperty(List.of(expectedSub1, expectedSub2));
 
