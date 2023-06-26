@@ -3,6 +3,7 @@ package io.github.wistefan.mapping;
 import io.github.wistefan.mapping.annotations.MappingEnabled;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -19,4 +20,5 @@ public abstract class Mapper {
 				.map(MappingEnabled.class::cast)
 				.findFirst();
 	}
+
 }
