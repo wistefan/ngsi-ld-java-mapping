@@ -3,6 +3,9 @@ package io.github.wistefan.mapping.desc;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.wistefan.mapping.NgsiLdAttribute;
+import io.github.wistefan.mapping.QueryAttributeType;
+import io.github.wistefan.mapping.desc.pojos.MyMultiTypePojo;
 import io.github.wistefan.mapping.desc.pojos.MyPojo;
 import io.github.wistefan.mapping.desc.pojos.MyPojoWithListOfSubEntity;
 import io.github.wistefan.mapping.desc.pojos.MyPojoWithListOfSubProperty;
@@ -320,21 +323,33 @@ class JavaObjectMapperTest {
 
 	@ParameterizedTest
 	@MethodSource("getNGSIAttributePaths")
-	void testGetNGSIAttributePath(Class<?> testClass, List<String> requestPath, List<String> ngsiPath) {
-		assertEquals(ngsiPath, javaObjectMapper.getNGSIAttributePath(requestPath, testClass),
+	void testGetNGSIAttributePath(Class<?> testClass, List<String> requestPath, NgsiLdAttribute expectedAttribute) {
+		assertEquals(expectedAttribute, JavaObjectMapper.getNGSIAttributePath(requestPath, testClass),
 				"The correct path mapping should have been returned.");
 	}
 
 	private static Stream<Arguments> getNGSIAttributePaths() {
 		return Stream.of(
-				Arguments.of(MyPojo.class, List.of("myName"), List.of("name")),
-				Arguments.of(MyPojo.class, List.of("numbers"), List.of("numbers")),
+				Arguments.of(MyPojo.class, List.of("myName"),
+						new NgsiLdAttribute(List.of("name"), QueryAttributeType.STRING)),
+				Arguments.of(MyPojo.class, List.of("numbers"),
+						new NgsiLdAttribute(List.of("numbers"), QueryAttributeType.STRING)),
 				Arguments.of(MyPojoWithSubProperty.class, List.of("mySubProperty", "propertyName"),
-						List.of("mySubProperty", "propertyName")),
+						new NgsiLdAttribute(List.of("mySubProperty", "propertyName"), QueryAttributeType.STRING)),
 				Arguments.of(MyPojoWithListOfSubEntity.class, List.of("mySubProperty", "myName"),
-						List.of("sub-entity", "name")),
+						new NgsiLdAttribute(List.of("sub-entity", "name"), QueryAttributeType.STRING)),
 				Arguments.of(MyPojoWithSubEntityEmbed.class, List.of("mySubProperty", "role"),
-						List.of("sub-entity", "role"))
+						new NgsiLdAttribute(List.of("sub-entity", "role"), QueryAttributeType.STRING)),
+				Arguments.of(MyMultiTypePojo.class, List.of("myBoolean"),
+						new NgsiLdAttribute(List.of("boolean"), QueryAttributeType.BOOLEAN)),
+				Arguments.of(MyMultiTypePojo.class, List.of("myNumber"),
+						new NgsiLdAttribute(List.of("number"), QueryAttributeType.NUMBER)),
+				Arguments.of(MyMultiTypePojo.class, List.of("myProperty", "number"),
+						new NgsiLdAttribute(List.of("property", "number"), QueryAttributeType.NUMBER)),
+				Arguments.of(MyMultiTypePojo.class, List.of("myProperty", "aBoolean"),
+						new NgsiLdAttribute(List.of("property", "aBoolean"), QueryAttributeType.BOOLEAN)),
+				Arguments.of(MyMultiTypePojo.class, List.of("myProperty", "string"),
+						new NgsiLdAttribute(List.of("property", "string"), QueryAttributeType.STRING))
 		);
 	}
 

@@ -48,14 +48,15 @@ public class JavaObjectMapper extends Mapper {
 	public static final String WAS_NOT_ABLE_INVOKE_METHOD_TEMPLATE = "Was not able invoke method %s on %s";
 
 	/**
-	 * Translate the attribute path for the given object into the path in the ngis-ld model.
+	 * Translate the attribute path for the given object into the path in the ngsi-ld model.
 	 *
 	 * @param attributePath the original path
-	 * @param tClass class to use for translation
-	 * @return the path in ngsi-ld
+	 * @param tClass        class to use for translation
+	 * @return the path in ngsi-ld and the type of the target attribute
 	 */
-	public <T> List<String> getNGSIAttributePath(List<String> attributePath, Class<T> tClass) {
+	public static <T> NgsiLdAttribute getNGSIAttributePath(List<String> attributePath, Class<T> tClass) {
 		List<String> ngsiAttributePath = new ArrayList<>();
+		QueryAttributeType type = QueryAttributeType.STRING;
 		String currentAttribute = attributePath.get(0);
 		if (isMappingEnabled(tClass).isPresent()) {
 			// for mapped properties, we have to climb down the property names
@@ -72,12 +73,17 @@ public class JavaObjectMapper extends Mapper {
 				// no need to check again
 				AttributeSetter setterAnnotation = getAttributeSetter(setterMethod.getAnnotations()).get();
 				ngsiAttributePath.add(setterAnnotation.targetName());
+				type = fromClass(getterMethod.getReturnType());
 				if (attributePath.size() > 1) {
 					List<String> subPaths = attributePath.subList(1, attributePath.size());
-					if (setterAnnotation.targetClass() != null) {
-						ngsiAttributePath.addAll(getNGSIAttributePath(subPaths, setterAnnotation.targetClass()));
+					if (setterAnnotation.targetClass() != Object.class) {
+						NgsiLdAttribute subAttribute = getNGSIAttributePath(subPaths, setterAnnotation.targetClass());
+						ngsiAttributePath.addAll(subAttribute.path());
+						type = subAttribute.type();
 					} else {
-						ngsiAttributePath.addAll(getNGSIAttributePath(subPaths, getterMethod.getReturnType()));
+						NgsiLdAttribute subAttribute = getNGSIAttributePath(subPaths, getterMethod.getReturnType());
+						ngsiAttributePath.addAll(subAttribute.path());
+						type = subAttribute.type();
 					}
 				}
 			} else {
@@ -87,41 +93,71 @@ public class JavaObjectMapper extends Mapper {
 		} else {
 			// we can use the "plain" object field-names, no additional mapping happens anymore
 			ngsiAttributePath.addAll(attributePath);
+			type = evaluateType(attributePath, tClass);
 		}
-		return ngsiAttributePath;
+		return new NgsiLdAttribute(ngsiAttributePath, type);
 	}
 
-	public <T> Stream<Method> getSetterMethodByName(Class<T> tClass, String propertyName) {
+	private static QueryAttributeType evaluateType(List<String> path, Class<?> tClass) {
+		Class<?> currentClass = tClass;
+		for (String s : path) {
+			try {
+				Optional<Class<?>> optionalReturn = getGetterMethodByName(currentClass, s).findAny()
+						.map(Method::getReturnType);
+				if (optionalReturn.isPresent()) {
+					currentClass = optionalReturn.get();
+				} else {
+					currentClass = currentClass.getField(s).getType();
+				}
+			} catch (NoSuchFieldException e) {
+				throw new MappingException(String.format("No field %s exists for %s.", s, tClass.getCanonicalName()),
+						e);
+			}
+		}
+		return fromClass(currentClass);
+	}
+
+	private static QueryAttributeType fromClass(Class<?> tClass) {
+		if (Number.class.isAssignableFrom(tClass)) {
+			return QueryAttributeType.NUMBER;
+		} else if (Boolean.class.isAssignableFrom(tClass)) {
+			return QueryAttributeType.BOOLEAN;
+		}
+		return QueryAttributeType.STRING;
+
+	}
+
+	public static <T> Stream<Method> getSetterMethodByName(Class<T> tClass, String propertyName) {
 		return Arrays.stream(tClass.getMethods())
 				.filter(m -> getCorrespondingSetterFieldName(m.getName()).equals(propertyName));
 	}
 
-	public <T> Stream<Method> getGetterMethodByName(Class<T> tClass, String propertyName) {
+	public static <T> Stream<Method> getGetterMethodByName(Class<T> tClass, String propertyName) {
 		return Arrays.stream(tClass.getMethods())
 				.filter(m -> getCorrespondingGetterFieldName(m.getName()).equals(propertyName));
 	}
 
-	private String getCorrespondingGetterFieldName(String methodName) {
+	private static String getCorrespondingGetterFieldName(String methodName) {
 		var fieldName = "";
 		if (methodName.matches("^get[A-Z].*")) {
 			fieldName = methodName.replaceFirst("get", "");
 		} else if (methodName.matches("^is[A-Z].*")) {
 			fieldName = methodName.replaceFirst("is", "");
 		} else {
-			log.info("The method {} is nether a get or is.", methodName);
+			log.debug("The method {} is neither a get or is.", methodName);
 			return fieldName;
 		}
 		return fieldName.substring(0, 1).toLowerCase() + fieldName.substring(1);
 	}
 
-	private String getCorrespondingSetterFieldName(String methodName) {
+	private static String getCorrespondingSetterFieldName(String methodName) {
 		var fieldName = "";
 		if (methodName.matches("^set[A-Z].*")) {
 			fieldName = methodName.replaceFirst("set", "");
 		} else if (methodName.matches("^is[A-Z].*")) {
 			fieldName = methodName.replaceFirst("is", "");
 		} else {
-			log.info("The method {} is nether a set or is.", methodName);
+			log.debug("The method {} is neither a set or is.", methodName);
 			return fieldName;
 		}
 		return fieldName.substring(0, 1).toLowerCase() + fieldName.substring(1);
@@ -137,7 +173,8 @@ public class JavaObjectMapper extends Mapper {
 	public <T> EntityVO toEntityVO(T entity) {
 		isMappingEnabled(entity.getClass())
 				.orElseThrow(() -> new UnsupportedOperationException(
-						String.format("Generic mapping to NGSI-LD entities is not supported for object %s", entity)));
+						String.format("Generic mapping to NGSI-LD entities is not supported for object %s",
+								entity)));
 
 		List<Method> entityIdMethod = new ArrayList<>();
 		List<Method> entityTypeMethod = new ArrayList<>();
@@ -183,7 +220,8 @@ public class JavaObjectMapper extends Mapper {
 
 		}
 
-		return buildEntity(entity, entityIdMethod.get(0), entityTypeMethod.get(0), propertyMethods, propertyListMethods,
+		return buildEntity(entity, entityIdMethod.get(0), entityTypeMethod.get(0), propertyMethods,
+				propertyListMethods,
 				geoPropertyMethods, relationshipMethods, relationshipListMethods);
 	}
 
@@ -191,7 +229,8 @@ public class JavaObjectMapper extends Mapper {
 	 * Build the entity from its declared methods.
 	 */
 	private <T> EntityVO buildEntity(T entity, Method entityIdMethod, Method entityTypeMethod,
-			List<Method> propertyMethods, List<Method> propertyListMethods, List<Method> geoPropertyMethods,
+			List<Method> propertyMethods, List<Method> propertyListMethods,
+			List<Method> geoPropertyMethods,
 			List<Method> relationshipMethods, List<Method> relationshipListMethods) {
 
 		EntityVO entityVO = new EntityVO();
@@ -217,7 +256,8 @@ public class JavaObjectMapper extends Mapper {
 			}
 			entityVO.setType((String) entityTypeObject);
 		} catch (IllegalAccessException | InvocationTargetException e) {
-			throw new MappingException(String.format(WAS_NOT_ABLE_INVOKE_METHOD_TEMPLATE, "unknown-method", entity), e);
+			throw new MappingException(String.format(WAS_NOT_ABLE_INVOKE_METHOD_TEMPLATE, "unknown-method", entity),
+					e);
 		}
 
 		Map<String, AdditionalPropertyVO> additionalProperties = new LinkedHashMap<>();
@@ -225,7 +265,8 @@ public class JavaObjectMapper extends Mapper {
 		additionalProperties.putAll(buildPropertyList(entity, propertyListMethods));
 		additionalProperties.putAll(buildGeoProperties(entity, geoPropertyMethods));
 		Map<String, RelationshipVO> relationshipVOMap = buildRelationships(entity, relationshipMethods);
-		Map<String, RelationshipListVO> relationshipListVOMap = buildRelationshipList(entity, relationshipListMethods);
+		Map<String, RelationshipListVO> relationshipListVOMap = buildRelationshipList(entity,
+				relationshipListMethods);
 		// we need to post-process the relationships, since orion-ld only accepts dataset-ids for lists > 1
 		relationshipVOMap.entrySet().stream().forEach(e -> e.getValue().setDatasetId(null));
 		relationshipListVOMap.entrySet().stream().forEach(e -> {
@@ -270,7 +311,8 @@ public class JavaObjectMapper extends Mapper {
 	/**
 	 * Build a list of relationships from the declared methods
 	 */
-	private <T> Map<String, RelationshipListVO> buildRelationshipList(T entity, List<Method> relationshipListMethods) {
+	private <
+			T> Map<String, RelationshipListVO> buildRelationshipList(T entity, List<Method> relationshipListMethods) {
 		return relationshipListMethods.stream()
 				.map(relationshipMethod -> methodToRelationshipListEntry(entity, relationshipMethod))
 				.filter(Optional::isPresent)
@@ -329,7 +371,8 @@ public class JavaObjectMapper extends Mapper {
 	 * Get all methods declared as attribute getters.
 	 */
 	private <T> List<Method> getAttributeGettersMethods(T entity) {
-		return Arrays.stream(entity.getClass().getMethods()).filter(m -> getAttributeGetterAnnotation(m).isPresent())
+		return Arrays.stream(entity.getClass().getMethods())
+				.filter(m -> getAttributeGetterAnnotation(m).isPresent())
 				.toList();
 	}
 
@@ -344,7 +387,7 @@ public class JavaObjectMapper extends Mapper {
 	/**
 	 * Find the attribute getter from all the annotations.
 	 */
-	private Optional<AttributeGetter> getAttributeGetter(Annotation[] annotations) {
+	private static Optional<AttributeGetter> getAttributeGetter(Annotation[] annotations) {
 		return Arrays.stream(annotations).filter(AttributeGetter.class::isInstance).map(AttributeGetter.class::cast)
 				.findFirst();
 	}
@@ -352,7 +395,7 @@ public class JavaObjectMapper extends Mapper {
 	/**
 	 * Find the attribute setter from all the annotations.
 	 */
-	private Optional<AttributeSetter> getAttributeSetter(Annotation[] annotations) {
+	private static Optional<AttributeSetter> getAttributeSetter(Annotation[] annotations) {
 		return Arrays.stream(annotations).filter(AttributeSetter.class::isInstance).map(AttributeSetter.class::cast)
 				.findFirst();
 	}
@@ -432,7 +475,8 @@ public class JavaObjectMapper extends Mapper {
 	/**
 	 * Build a relationship list entry from the given method on the entity
 	 */
-	private <T> Optional<Map.Entry<String, RelationshipListVO>> methodToRelationshipListEntry(T entity, Method method) {
+	private <
+			T> Optional<Map.Entry<String, RelationshipListVO>> methodToRelationshipListEntry(T entity, Method method) {
 		try {
 			Object o = method.invoke(entity);
 			if (o == null) {
@@ -498,7 +542,8 @@ public class JavaObjectMapper extends Mapper {
 
 			return relationshipVO;
 		} catch (IllegalAccessException | InvocationTargetException e) {
-			throw new MappingException(String.format(WAS_NOT_ABLE_INVOKE_METHOD_TEMPLATE, method, relationShipObject));
+			throw new MappingException(
+					String.format(WAS_NOT_ABLE_INVOKE_METHOD_TEMPLATE, method, relationShipObject));
 		}
 	}
 
