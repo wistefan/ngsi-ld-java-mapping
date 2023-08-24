@@ -1,6 +1,9 @@
 package io.github.wistefan.mapping;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.wistefan.mapping.annotations.*;
+import io.github.wistefan.mapping.subscription.SubscriptionMixin;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fiware.ngsi.model.*;
@@ -10,7 +13,6 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
-import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -27,9 +29,6 @@ public class JavaObjectMapper extends Mapper {
 
 	public static final String NO_MAPPING_DEFINED_FOR_METHOD_TEMPLATE = "No mapping defined for method %s";
 	public static final String WAS_NOT_ABLE_INVOKE_METHOD_TEMPLATE = "Was not able invoke method %s on %s";
-
-	private static final String PROPERTY_NAME_Q = "q";
-	private static final String PROPERTY_NAME_EXPIRES = "expires";
 
 	/**
 	 * Translate the attribute path for the given object into the path in the ngsi-ld model.
@@ -273,101 +272,12 @@ public class JavaObjectMapper extends Mapper {
 						String.format("Generic mapping to NGSI-LD subscriptions is not supported for object %s",
 								subscription)));
 
-		List<Method> subscriptionIdMethod = new ArrayList<>();
-		List<Method> subscriptionTypeMethod = new ArrayList<>();
-		Map<String, Method> propertyMethods = new HashMap<>();
-		List<Method> propertySetMethods = new ArrayList<>();
-		List<Method> geoQueryMethods = new ArrayList<>();
-		List<Method> entityInfoMethods = new ArrayList<>();
-		List<Method> notificationMethods = new ArrayList<>();
+		ObjectMapper objectMapper = new ObjectMapper();
+		objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+		objectMapper.addMixIn(SubscriptionVO.class, SubscriptionMixin.class);
 
-		Arrays.stream(subscription.getClass().getMethods()).forEach(method -> {
-			if (isSubscriptionIdMethod(method)) {
-				subscriptionIdMethod.add(method);
-			} else if (isSubscriptionTypeMethod(method)) {
-				subscriptionTypeMethod.add(method);
-			} else {
-				getAttributeGetter(method.getAnnotations()).ifPresent(annotation -> {
-					switch (annotation.value()) {
-						case PROPERTY -> propertyMethods.put(annotation.targetName(), method);
-						case PROPERTY_SET -> propertySetMethods.add(method);
-						case GEO_QUERY -> geoQueryMethods.add(method);
-						case ENTITY_INFO_LIST -> entityInfoMethods.add(method);
-						case NOTIFICATION_PARAMS -> notificationMethods.add(method);
-						default -> throw new UnsupportedOperationException(
-								String.format("Mapping target %s is not supported.", annotation.value()));
-					}
-				});
-			}
-		});
-
-		if (subscriptionIdMethod.size() != 1) {
-			throw new MappingException(
-					String.format("The provided object declares %s id methods, exactly one is expected.",
-							subscriptionIdMethod.size()));
-		}
-		if (subscriptionTypeMethod.size() != 1) {
-			throw new MappingException(
-					String.format("The provided object declares %s type methods, exactly one is expected.",
-							subscriptionTypeMethod.size()));
-
-		}
-
-		return buildSubscription(subscription, subscriptionIdMethod.get(0), subscriptionTypeMethod.get(0),
-				propertyMethods, geoQueryMethods.get(0), propertySetMethods.get(0), entityInfoMethods.get(0),
-				notificationMethods.get(0));
-	}
-
-	private <T> SubscriptionVO buildSubscription(T subscription, Method subscriptionIdMethod, Method subscriptionTypeMethod,
-												 Map<String, Method> propertyMethods, Method geoQueryMethod,
-												 Method propertySetMethod, Method entityInfoMethod,
-												 Method notificationMethod) {
-		SubscriptionVO subscriptionVO = new SubscriptionVO();
-
+		SubscriptionVO subscriptionVO = objectMapper.convertValue(subscription, SubscriptionVO.class);
 		subscriptionVO.setAtContext(DEFAULT_CONTEXT);
-
-		try {
-			Object subscriptionIdObject = subscriptionIdMethod.invoke(subscription);
-			if (!(subscriptionIdObject instanceof URI)) {
-				throw new MappingException(
-						String.format("The subscriptionId method does not return a valid URI for subscription %s.",
-								subscription));
-			}
-			subscriptionVO.setId((URI) subscriptionIdObject);
-
-			Object subscriptionTypeObject = subscriptionTypeMethod.invoke(subscription);
-			if (!(subscriptionTypeObject instanceof String)) {
-				throw new MappingException("The subscriptionType method does not return a valid String.");
-			}
-			subscriptionVO.setType(SubscriptionVO.Type.toEnum(subscriptionTypeObject.toString()));
-
-			Object geoQueryObject = geoQueryMethod.invoke(subscription);
-			subscriptionVO.setGeoQ((GeoQueryVO) geoQueryObject);
-
-			Object queryObject = propertyMethods.get(PROPERTY_NAME_Q).invoke(subscription);
-			if (!(queryObject instanceof String)) {
-				throw new MappingException("The query method does not return a valid String.");
-			}
-			subscriptionVO.setQ(queryObject.toString());
-
-			Object expiresObject = propertyMethods.get(PROPERTY_NAME_EXPIRES).invoke(subscription);
-			if (!(expiresObject instanceof Instant)) {
-				throw new MappingException("The query method does not return a valid Instant.");
-			}
-			subscriptionVO.setExpires((Instant) expiresObject);
-
-			Object notificationObject = notificationMethod.invoke(subscription);
-			subscriptionVO.setNotification((NotificationParamsVO) notificationObject);
-
-			Object propertySetObject = propertySetMethod.invoke(subscription);
-			subscriptionVO.setWatchedAttributes((Set<String>) propertySetObject);
-
-			Object entitiesObject = entityInfoMethod.invoke(subscription);
-			subscriptionVO.setEntities((List<EntityInfoVO>) entitiesObject);
-		} catch (IllegalAccessException | InvocationTargetException e) {
-			throw new MappingException(String.format(WAS_NOT_ABLE_INVOKE_METHOD_TEMPLATE, "unknown-method", subscription),
-					e);
-		}
 
 		return subscriptionVO;
 	}
@@ -384,20 +294,6 @@ public class JavaObjectMapper extends Mapper {
 	 */
 	private boolean isEntityIdMethod(Method method) {
 		return Arrays.stream(method.getAnnotations()).anyMatch(EntityId.class::isInstance);
-	}
-
-	/**
-	 * Check if the given method defines the subscription type
-	 */
-	private boolean isSubscriptionTypeMethod(Method method) {
-		return Arrays.stream(method.getAnnotations()).anyMatch(SubscriptionType.class::isInstance);
-	}
-
-	/**
-	 * Check if the given method defines the subscription id
-	 */
-	private boolean isSubscriptionIdMethod(Method method) {
-		return Arrays.stream(method.getAnnotations()).anyMatch(SubscriptionId.class::isInstance);
 	}
 
 	/**

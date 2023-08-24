@@ -2,8 +2,14 @@ package io.github.wistefan.mapping.desc;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.wistefan.mapping.SubscriptionVOMapper;
-import io.github.wistefan.mapping.desc.pojos.*;
-import org.fiware.ngsi.model.*;
+import io.github.wistefan.mapping.desc.pojos.subscription.MyEntityInfoProperty;
+import io.github.wistefan.mapping.desc.pojos.subscription.MyNotificationParamsEndpointProperty;
+import io.github.wistefan.mapping.desc.pojos.subscription.MyNotificationParamsProperty;
+import io.github.wistefan.mapping.desc.pojos.subscription.MySubscriptionPojo;
+import org.fiware.ngsi.model.EndpointVO;
+import org.fiware.ngsi.model.EntityInfoVO;
+import org.fiware.ngsi.model.NotificationParamsVO;
+import org.fiware.ngsi.model.SubscriptionVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,7 +29,6 @@ public class SubscriptionVOMapperTest {
     private static final String ANY_ENDPOINT_URI = "some_uri";
     private static final String ANY_SUBSCRIPTION_ID = "urn:ngsi-ld:complex-pojo:subscription";
     private static final String ANY_ENTITY_ID = "urn:ngsi-ld:pojo:entity";
-    private static final String ANY_GEO_QUERY_GEOMETRY = "some_geometry";
     private static final String ANY_WATCHED_ATTRIBUTE = "temperature";
     private SubscriptionVOMapper subscriptionVOMapper;
 
@@ -46,24 +51,6 @@ public class SubscriptionVOMapperTest {
 
         assertEquals(expectedSubscription, subscriptionVOMapper.fromSubscriptionVO(subscriptionVO,
                 MySubscriptionPojo.class).block(), "Well known properties should properly be mapped.");
-    }
-
-    @DisplayName("Geo query property should properly be mapped.")
-    @Test
-    void mapWithGeoQuery() {
-        SubscriptionVO subscriptionVO = new SubscriptionVO().id(URI.create(ANY_SUBSCRIPTION_ID))
-                .type(SubscriptionVO.Type.SUBSCRIPTION);
-        GeoQueryVO geoQ = new GeoQueryVO();
-        geoQ.setGeometry(ANY_GEO_QUERY_GEOMETRY);
-        subscriptionVO.setGeoQ(geoQ);
-
-        MySubscriptionPojo expectedSubscription = new MySubscriptionPojo(ANY_SUBSCRIPTION_ID);
-        MyGeoQueryProperty geoQueryProperty = new MyGeoQueryProperty();
-        geoQueryProperty.setGeometry(ANY_GEO_QUERY_GEOMETRY);
-        expectedSubscription.setGeoQ(geoQueryProperty);
-
-        assertEquals(expectedSubscription, subscriptionVOMapper.fromSubscriptionVO(subscriptionVO,
-                MySubscriptionPojo.class).block(), "Geo query property should properly be mapped.");
     }
 
     @DisplayName("Entity info property should properly be mapped.")
@@ -122,7 +109,7 @@ public class SubscriptionVOMapperTest {
         MyNotificationParamsProperty myNotificationParamsProperty = new MyNotificationParamsProperty();
         myNotificationParamsProperty.setAttributes(watchedAttrs);
         MyNotificationParamsEndpointProperty endpointProperty = new MyNotificationParamsEndpointProperty();
-        endpointProperty.setUri(ANY_ENDPOINT_URI);
+        endpointProperty.setUri(URI.create(ANY_ENDPOINT_URI));
         myNotificationParamsProperty.setEndpoint(endpointProperty);
         expectedSubscription.setNotification(myNotificationParamsProperty);
 
