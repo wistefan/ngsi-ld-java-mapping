@@ -278,6 +278,7 @@ public class JavaObjectMapper extends Mapper {
 
 		SubscriptionVO subscriptionVO = objectMapper.convertValue(subscription, SubscriptionVO.class);
 		subscriptionVO.setAtContext(DEFAULT_CONTEXT);
+		subscriptionVO.setGeoQ(null);
 
 		return subscriptionVO;
 	}
