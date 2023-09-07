@@ -1428,6 +1428,16 @@ components:
           $ref: '#/components/schemas/GeoQuery'
         csf:
           type: string
+    KeyValuePair:
+      type: object
+      required:
+        - key
+        - value
+      properties:
+        key:
+          type: string
+        value:
+          type: string
     Endpoint:
       type: object
       required:
@@ -1440,6 +1450,10 @@ components:
           type: string
           enum:
             - application/ld+json
+        receiverInfo:
+          type: array
+          items:
+            $ref: '#/components/schemas/KeyValuePair'
     NotificationParams:
       type: object
       properties:
@@ -1511,6 +1525,27 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/Subscription'
+    Notification:
+      type: object
+      properties:
+        '@context':
+          $ref: '#/components/schemas/LdContext'
+        id:
+          type: string
+          format: uri
+        type:
+          $ref: '#/components/schemas/Name'
+        subscriptionId:
+          type: string
+          format: uri
+        notifiedAt:
+          type: string
+          format: date-time
+        data:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/Entity'
     RegistrationInfo:
       type: object
       properties:
