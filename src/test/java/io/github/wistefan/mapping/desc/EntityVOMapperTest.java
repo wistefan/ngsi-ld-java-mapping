@@ -17,11 +17,7 @@ import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithSubEntityWellKnow
 import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithWrongConstructor;
 import io.github.wistefan.mapping.desc.pojos.invalid.MySetterThrowingPojo;
 import io.github.wistefan.mapping.desc.pojos.invalid.MyThrowingConstructor;
-import org.fiware.ngsi.model.AdditionalPropertyVO;
-import org.fiware.ngsi.model.EntityVO;
-import org.fiware.ngsi.model.PropertyVO;
-import org.fiware.ngsi.model.RelationshipListVO;
-import org.fiware.ngsi.model.RelationshipVO;
+import org.fiware.ngsi.model.*;
 import io.github.wistefan.mapping.AdditionalPropertyMixin;
 import io.github.wistefan.mapping.EntitiesRepository;
 import io.github.wistefan.mapping.EntityVOMapper;
@@ -36,6 +32,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Matchers.anyList;
 import static org.mockito.Mockito.mock;
@@ -300,6 +297,29 @@ class EntityVOMapperTest {
         entityVO.setAdditionalProperties("mySubProperty", propertyVO);
 
         assertEquals(myPojoWithListOfSubProperty, entityVOMapper.fromEntityVO(entityVO, MyPojoWithListOfSubProperty.class).block(), "The sub property should be mapped to a list.");
+    }
+
+    @Test
+    void testReadingNotificationFromJson() throws JsonProcessingException {
+        String json = """
+                {
+                  "id": "urn:ngsi-ld:Notification:4233e3ca-50c3-11ee-8433-0a580a826912",
+                  "type": "Notification",
+                  "subscriptionId": "urn:ngsi-ld:subscription:567f4788-50bf-11ee-94e9-0a580a826911",
+                  "notifiedAt": "2023-09-11T16:50:05.456Z",
+                  "data": [
+                    {
+                      "id": "urn:ngsi-ld:product:4d0964a4-2341-4676-a551-de5115ccf98d",
+                      "type": "product",
+                      "deletedAt": "2023-09-11T16:50:05.456Z"
+                    }
+                  ],
+                  "trigger": "DELETE /ngsi-ld/v1/entities/urn:ngsi-ld:product:4d0964a4-2341-4676-a551-de5115ccf98d"
+                }""";
+        NotificationVO notificationVO = entityVOMapper.readNotificationFromJSON(json);
+
+        assertNotNull(notificationVO);
+        assertEquals("Notification", notificationVO.getType());
     }
 
 }

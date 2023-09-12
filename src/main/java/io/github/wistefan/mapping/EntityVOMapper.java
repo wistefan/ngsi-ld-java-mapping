@@ -1,14 +1,10 @@
 package io.github.wistefan.mapping;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.wistefan.mapping.annotations.AttributeSetter;
 import lombok.extern.slf4j.Slf4j;
-import org.fiware.ngsi.model.AdditionalPropertyVO;
-import org.fiware.ngsi.model.EntityVO;
-import org.fiware.ngsi.model.PropertyListVO;
-import org.fiware.ngsi.model.PropertyVO;
-import org.fiware.ngsi.model.RelationshipListVO;
-import org.fiware.ngsi.model.RelationshipVO;
+import org.fiware.ngsi.model.*;
 import io.github.wistefan.mapping.annotations.AttributeType;
 import io.github.wistefan.mapping.annotations.MappingEnabled;
 import reactor.core.publisher.Mono;
@@ -44,6 +40,10 @@ public class EntityVOMapper extends Mapper {
         this.objectMapper
                 .addMixIn(AdditionalPropertyVO.class, AdditionalPropertyMixin.class);
         this.objectMapper.findAndRegisterModules();
+    }
+
+    public NotificationVO readNotificationFromJSON(String json) throws JsonProcessingException {
+        return objectMapper.readValue(json, NotificationVO.class);
     }
 
     /**
