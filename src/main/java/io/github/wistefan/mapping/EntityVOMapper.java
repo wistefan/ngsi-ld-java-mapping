@@ -1,6 +1,7 @@
 package io.github.wistefan.mapping;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.wistefan.mapping.annotations.AttributeSetter;
 import lombok.extern.slf4j.Slf4j;
@@ -39,11 +40,25 @@ public class EntityVOMapper extends Mapper {
         this.entitiesRepository = entitiesRepository;
         this.objectMapper
                 .addMixIn(AdditionalPropertyVO.class, AdditionalPropertyMixin.class);
+        this.objectMapper.addMixIn(SubscriptionVO.class, SubscriptionMixin.class);
         this.objectMapper.findAndRegisterModules();
     }
 
     public NotificationVO readNotificationFromJSON(String json) throws JsonProcessingException {
         return objectMapper.readValue(json, NotificationVO.class);
+    }
+
+    public <T> SubscriptionVO toSubscriptionVO(T subscription) {
+        isMappingEnabled(subscription.getClass())
+                .orElseThrow(() -> new UnsupportedOperationException(
+                        String.format("Generic mapping to NGSI-LD subscriptions is not supported for object %s",
+                                subscription)));
+
+        SubscriptionVO subscriptionVO = objectMapper.convertValue(subscription, SubscriptionVO.class);
+        subscriptionVO.setAtContext(JavaObjectMapper.DEFAULT_CONTEXT);
+        subscriptionVO.setGeoQ(null);
+
+        return subscriptionVO;
     }
 
     /**

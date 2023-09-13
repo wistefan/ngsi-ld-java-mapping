@@ -2,26 +2,19 @@ package io.github.wistefan.mapping.desc;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.wistefan.mapping.desc.pojos.MyPojo;
-import io.github.wistefan.mapping.desc.pojos.MyPojoWithListOfSubProperty;
-import io.github.wistefan.mapping.desc.pojos.MyPojoWithSubEntity;
-import io.github.wistefan.mapping.desc.pojos.MyPojoWithSubEntityEmbed;
-import io.github.wistefan.mapping.desc.pojos.MyPojoWithSubEntityFrom;
-import io.github.wistefan.mapping.desc.pojos.MyPojoWithSubEntityListFrom;
-import io.github.wistefan.mapping.desc.pojos.MySubProperty;
-import io.github.wistefan.mapping.desc.pojos.MySubPropertyEntity;
-import io.github.wistefan.mapping.desc.pojos.MySubPropertyEntityEmbed;
-import io.github.wistefan.mapping.desc.pojos.MySubPropertyEntityWithWellKnown;
-import io.github.wistefan.mapping.desc.pojos.PropertyListPojo;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithSubEntityWellKnown;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithWrongConstructor;
-import io.github.wistefan.mapping.desc.pojos.invalid.MySetterThrowingPojo;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyThrowingConstructor;
-import org.fiware.ngsi.model.*;
 import io.github.wistefan.mapping.AdditionalPropertyMixin;
 import io.github.wistefan.mapping.EntitiesRepository;
 import io.github.wistefan.mapping.EntityVOMapper;
 import io.github.wistefan.mapping.MappingException;
+import io.github.wistefan.mapping.desc.pojos.*;
+import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithSubEntityWellKnown;
+import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithWrongConstructor;
+import io.github.wistefan.mapping.desc.pojos.invalid.MySetterThrowingPojo;
+import io.github.wistefan.mapping.desc.pojos.invalid.MyThrowingConstructor;
+import io.github.wistefan.mapping.desc.pojos.subscription.MyNotificationParamsEndpointProperty;
+import io.github.wistefan.mapping.desc.pojos.subscription.MyNotificationParamsProperty;
+import io.github.wistefan.mapping.desc.pojos.subscription.MySubscriptionPojo;
+import org.fiware.ngsi.model.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,9 +24,7 @@ import java.net.URI;
 import java.time.Instant;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Matchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -320,6 +311,46 @@ class EntityVOMapperTest {
 
         assertNotNull(notificationVO);
         assertEquals("Notification", notificationVO.getType());
+    }
+
+    @DisplayName("Query mapping")
+    @Test
+    void testQueryMapping() {
+        MySubscriptionPojo myPojo = createSubscription();
+
+        assertEquals(myPojo.getQ(), entityVOMapper.toSubscriptionVO(myPojo).getQ(),
+                "The pojo should have the same query");
+    }
+
+    @DisplayName("Notification endpoint mapping")
+    @Test
+    void testNotificationEndpointMapping() {
+        MySubscriptionPojo myPojo = createSubscription();
+
+        assertEquals(myPojo.getNotification().getEndpoint().getUri(), entityVOMapper.toSubscriptionVO(myPojo).getNotification().getEndpoint().getUri(),
+                "The pojo should have the same notification endpoint");
+    }
+
+    private MySubscriptionPojo createSubscription() {
+        MySubscriptionPojo myPojo = new MySubscriptionPojo("urn:ngsi-ld:my-pojo:the-test-pojo");
+        myPojo.setQ("eventType=custom");
+        myPojo.setNotification(createNotification());
+
+        return myPojo;
+    }
+
+    private MyNotificationParamsEndpointProperty createEndpoint() {
+        MyNotificationParamsEndpointProperty endpointProperty = new MyNotificationParamsEndpointProperty();
+        endpointProperty.setUri(URI.create("test.com"));
+        endpointProperty.setAccept("application/ld+json");
+        return endpointProperty;
+    }
+
+    private MyNotificationParamsProperty createNotification() {
+        MyNotificationParamsProperty notificationParamsProperty = new MyNotificationParamsProperty();
+        notificationParamsProperty.setEndpoint(createEndpoint());
+        notificationParamsProperty.setFormat("keyValues");
+        return notificationParamsProperty;
     }
 
 }

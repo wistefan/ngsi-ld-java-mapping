@@ -1,7 +1,5 @@
 package io.github.wistefan.mapping;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.wistefan.mapping.annotations.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +22,7 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class JavaObjectMapper extends Mapper {
 
-	private static final String DEFAULT_CONTEXT = "https://smartdatamodels.org/context.jsonld";
+	public static final String DEFAULT_CONTEXT = "https://smartdatamodels.org/context.jsonld";
 
 	public static final String NO_MAPPING_DEFINED_FOR_METHOD_TEMPLATE = "No mapping defined for method %s";
 	public static final String WAS_NOT_ABLE_INVOKE_METHOD_TEMPLATE = "Was not able invoke method %s on %s";
@@ -263,23 +261,6 @@ public class JavaObjectMapper extends Mapper {
 		additionalProperties.forEach(entityVO::setAdditionalProperties);
 
 		return entityVO;
-	}
-
-	public <T> SubscriptionVO toSubscriptionVO(T subscription) {
-		isMappingEnabled(subscription.getClass())
-				.orElseThrow(() -> new UnsupportedOperationException(
-						String.format("Generic mapping to NGSI-LD subscriptions is not supported for object %s",
-								subscription)));
-
-		ObjectMapper objectMapper = new ObjectMapper();
-		objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-		objectMapper.addMixIn(SubscriptionVO.class, SubscriptionMixin.class);
-
-		SubscriptionVO subscriptionVO = objectMapper.convertValue(subscription, SubscriptionVO.class);
-		subscriptionVO.setAtContext(DEFAULT_CONTEXT);
-		subscriptionVO.setGeoQ(null);
-
-		return subscriptionVO;
 	}
 
 	/**
