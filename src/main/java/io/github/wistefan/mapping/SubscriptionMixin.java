@@ -1,4 +1,4 @@
-package io.github.wistefan.mapping.subscription;
+package io.github.wistefan.mapping;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.fiware.ngsi.model.GeoQueryVO;

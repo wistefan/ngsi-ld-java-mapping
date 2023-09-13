@@ -6,7 +6,7 @@ import io.github.wistefan.mapping.JavaObjectMapper;
 import io.github.wistefan.mapping.desc.pojos.subscription.MyNotificationParamsEndpointProperty;
 import io.github.wistefan.mapping.desc.pojos.subscription.MyNotificationParamsProperty;
 import io.github.wistefan.mapping.desc.pojos.subscription.MySubscriptionPojo;
-import io.github.wistefan.mapping.subscription.SubscriptionMixin;
+import io.github.wistefan.mapping.SubscriptionMixin;
 import org.fiware.ngsi.model.SubscriptionVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

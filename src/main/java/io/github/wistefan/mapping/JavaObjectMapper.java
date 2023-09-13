@@ -3,7 +3,6 @@ package io.github.wistefan.mapping;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.wistefan.mapping.annotations.*;
-import io.github.wistefan.mapping.subscription.SubscriptionMixin;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fiware.ngsi.model.*;
