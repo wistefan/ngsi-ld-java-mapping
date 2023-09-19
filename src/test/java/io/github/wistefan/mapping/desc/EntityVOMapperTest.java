@@ -2,30 +2,16 @@ package io.github.wistefan.mapping.desc;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.wistefan.mapping.desc.pojos.MyPojo;
-import io.github.wistefan.mapping.desc.pojos.MyPojoWithListOfSubProperty;
-import io.github.wistefan.mapping.desc.pojos.MyPojoWithSubEntity;
-import io.github.wistefan.mapping.desc.pojos.MyPojoWithSubEntityEmbed;
-import io.github.wistefan.mapping.desc.pojos.MyPojoWithSubEntityFrom;
-import io.github.wistefan.mapping.desc.pojos.MyPojoWithSubEntityListFrom;
-import io.github.wistefan.mapping.desc.pojos.MySubProperty;
-import io.github.wistefan.mapping.desc.pojos.MySubPropertyEntity;
-import io.github.wistefan.mapping.desc.pojos.MySubPropertyEntityEmbed;
-import io.github.wistefan.mapping.desc.pojos.MySubPropertyEntityWithWellKnown;
-import io.github.wistefan.mapping.desc.pojos.PropertyListPojo;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithSubEntityWellKnown;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithWrongConstructor;
-import io.github.wistefan.mapping.desc.pojos.invalid.MySetterThrowingPojo;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyThrowingConstructor;
-import org.fiware.ngsi.model.AdditionalPropertyVO;
-import org.fiware.ngsi.model.EntityVO;
-import org.fiware.ngsi.model.PropertyVO;
-import org.fiware.ngsi.model.RelationshipListVO;
-import org.fiware.ngsi.model.RelationshipVO;
 import io.github.wistefan.mapping.AdditionalPropertyMixin;
 import io.github.wistefan.mapping.EntitiesRepository;
 import io.github.wistefan.mapping.EntityVOMapper;
 import io.github.wistefan.mapping.MappingException;
+import io.github.wistefan.mapping.desc.pojos.*;
+import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithSubEntityWellKnown;
+import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithWrongConstructor;
+import io.github.wistefan.mapping.desc.pojos.invalid.MySetterThrowingPojo;
+import io.github.wistefan.mapping.desc.pojos.invalid.MyThrowingConstructor;
+import org.fiware.ngsi.model.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,6 +20,7 @@ import reactor.core.publisher.Mono;
 import java.net.URI;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -302,4 +289,18 @@ class EntityVOMapperTest {
         assertEquals(myPojoWithListOfSubProperty, entityVOMapper.fromEntityVO(entityVO, MyPojoWithListOfSubProperty.class).block(), "The sub property should be mapped to a list.");
     }
 
+    @Test
+    public void testConvertEntityToMap() {
+        MySimplePojo pojo = new MySimplePojo();
+        pojo.setMyName("Some");
+        pojo.setNumbers(List.of());
+
+        assertEquals(
+            Map.ofEntries(
+                Map.entry("type", pojo.getType()),
+                Map.entry("myName", pojo.getMyName()),
+                Map.entry("numbers", pojo.getNumbers())
+            ),
+            entityVOMapper.convertEntityToMap(pojo));
+    }
 }
