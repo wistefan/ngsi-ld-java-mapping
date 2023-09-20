@@ -1,16 +1,12 @@
 package io.github.wistefan.mapping;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.wistefan.mapping.annotations.AttributeSetter;
-import lombok.extern.slf4j.Slf4j;
-import org.fiware.ngsi.model.AdditionalPropertyVO;
-import org.fiware.ngsi.model.EntityVO;
-import org.fiware.ngsi.model.PropertyListVO;
-import org.fiware.ngsi.model.PropertyVO;
-import org.fiware.ngsi.model.RelationshipListVO;
-import org.fiware.ngsi.model.RelationshipVO;
 import io.github.wistefan.mapping.annotations.AttributeType;
 import io.github.wistefan.mapping.annotations.MappingEnabled;
+import lombok.extern.slf4j.Slf4j;
+import org.fiware.ngsi.model.*;
 import reactor.core.publisher.Mono;
 
 import javax.inject.Singleton;
@@ -18,13 +14,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -44,6 +34,16 @@ public class EntityVOMapper extends Mapper {
         this.objectMapper
                 .addMixIn(AdditionalPropertyVO.class, AdditionalPropertyMixin.class);
         this.objectMapper.findAndRegisterModules();
+    }
+
+    /**
+     * Method to convert a Java-Object to Map representation
+     *
+     * @param entity    the entity to be converted
+     * @return the converted map
+     */
+    public <T> Map<String, Object> convertEntityToMap(T entity) {
+        return objectMapper.convertValue(entity, new TypeReference<>() {});
     }
 
     /**
