@@ -50,12 +50,12 @@ class EntityVOMapperTest {
         expectedPojo.setMySubProperty(expectedSubEntity);
 
 
-        String subEntityString = "{\"@context\":\"https://smartdatamodels.org/context.jsonld\",\"id\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"sub-entity\",\"name\":{\"type\":\"Property\",\"value\":\"myName\"}}";
+        String subEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"sub-entity\",\"name\":{\"type\":\"Property\",\"value\":\"myName\"}}";
         EntityVO subEntity = OBJECT_MAPPER.readValue(subEntityString, EntityVO.class);
 
         when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of(subEntity)));
 
-        String parentEntityString = "{\"@context\":\"https://smartdatamodels.org/context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity\":{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"datasetId\":\"urn:ngsi-ld:sub-entity:the-sub-entity\"}}";
+        String parentEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity\":{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"datasetId\":\"urn:ngsi-ld:sub-entity:the-sub-entity\"}}";
         EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
 
         MyPojoWithSubEntity myPojoWithSubEntity = entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntity.class).block();
@@ -69,12 +69,12 @@ class EntityVOMapperTest {
         MyPojoWithSubEntityEmbed expectedPojo = new MyPojoWithSubEntityEmbed("urn:ngsi-ld:complex-pojo:the-test-pojo");
         expectedPojo.setMySubProperty(expectedSubEntity);
 
-        String subEntityString = "{\"@context\":\"https://smartdatamodels.org/context.jsonld\",\"id\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"sub-entity\",\"name\":{\"type\":\"Property\",\"value\":\"myName\"}}";
+        String subEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"sub-entity\",\"name\":{\"type\":\"Property\",\"value\":\"myName\"}}";
         EntityVO subEntity = OBJECT_MAPPER.readValue(subEntityString, EntityVO.class);
 
         when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of(subEntity)));
 
-        String parentEntityString = "{\"@context\":\"https://smartdatamodels.org/context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity\":{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"datasetId\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"role\":{\"type\":\"Property\",\"value\":\"Sub-Entity\"}}}";
+        String parentEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity\":{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"datasetId\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"role\":{\"type\":\"Property\",\"value\":\"Sub-Entity\"}}}";
         EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
 
         MyPojoWithSubEntityEmbed myPojoWithSubEntityEmbed = entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityEmbed.class).block();
@@ -99,8 +99,8 @@ class EntityVOMapperTest {
         propertyListPojo.setPropertyList(List.of(property1, property2));
         propertyListPojo.setRelationshipList(List.of(subEntity1, subEntity2));
 
-        String subEntity1String = "{\"@context\":\"https://smartdatamodels.org/context.jsonld\",\"id\":\"urn:ngsi-ld:sub-entity:the-sub-entity-1\",\"type\":\"sub-entity\",\"name\":{\"type\":\"Property\",\"value\":\"myName\"}}";
-        String subEntity2String = "{\"@context\":\"https://smartdatamodels.org/context.jsonld\",\"id\":\"urn:ngsi-ld:sub-entity:the-sub-entity-2\",\"type\":\"sub-entity\",\"name\":{\"type\":\"Property\",\"value\":\"myName\"}}";
+        String subEntity1String = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:sub-entity:the-sub-entity-1\",\"type\":\"sub-entity\",\"name\":{\"type\":\"Property\",\"value\":\"myName\"}}";
+        String subEntity2String = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:sub-entity:the-sub-entity-2\",\"type\":\"sub-entity\",\"name\":{\"type\":\"Property\",\"value\":\"myName\"}}";
 
         EntityVO parsedSubEntity1 = OBJECT_MAPPER.readValue(subEntity1String, EntityVO.class);
         EntityVO parsedSubEntity2 = OBJECT_MAPPER.readValue(subEntity2String, EntityVO.class);
@@ -108,7 +108,7 @@ class EntityVOMapperTest {
         when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of(parsedSubEntity1, parsedSubEntity2)));
 
         String parentEntityString = "{\n" +
-                "\t\"@context\": \"https://smartdatamodels.org/context.jsonld\",\n" +
+                "\t\"@context\": \"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\n" +
                 "\t\"id\": \"urn:ngsi-ld:list-pojo:the-pojo\",\n" +
                 "\t\"type\": \"list-pojo\",\n" +
                 "\t\"mySubProperty\": {\n" +

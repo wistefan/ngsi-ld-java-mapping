@@ -42,7 +42,7 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class JavaObjectMapper extends Mapper {
 
-	private static final String DEFAULT_CONTEXT = "https://smartdatamodels.org/context.jsonld";
+	private static final String DEFAULT_CONTEXT = "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld";
 
 	/**
 	 * Context to be used for the entities.

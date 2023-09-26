@@ -68,7 +68,7 @@ class JavaObjectMapperTest {
 	@DisplayName("Simple pojo mapping.")
 	@Test
 	void testSimplePojoMapping() throws JsonProcessingException {
-		String expectedJson = "{\"@context\":\"https://smartdatamodels.org/context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-test-pojo\",\"type\":\"my-pojo\",\"name\":{\"type\":\"Property\",\"value\":\"The test pojo.\"},\"numbers\":{\"type\":\"Property\",\"value\":[1,2,3]}}";
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-test-pojo\",\"type\":\"my-pojo\",\"name\":{\"type\":\"Property\",\"value\":\"The test pojo.\"},\"numbers\":{\"type\":\"Property\",\"value\":[1,2,3]}}";
 
 		MyPojo myPojo = new MyPojo("urn:ngsi-ld:my-pojo:the-test-pojo");
 		myPojo.setNumbers(List.of(1, 2, 3));
@@ -86,7 +86,7 @@ class JavaObjectMapperTest {
 	@DisplayName("Map Pojo with a field that is an object.")
 	@Test
 	void testSubPropertyMapping() throws JsonProcessingException {
-		String expectedJson = "{\"@context\":\"https://smartdatamodels.org/context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"mySubProperty\":{\"value\":{\"propertyName\":\"My property\"},\"type\":\"Property\"}}";
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"mySubProperty\":{\"value\":{\"propertyName\":\"My property\"},\"type\":\"Property\"}}";
 
 		MyPojoWithSubProperty myComplexPojo = new MyPojoWithSubProperty("urn:ngsi-ld:complex-pojo:the-test-pojo");
 		MySubProperty mySubProperty = new MySubProperty();
@@ -100,7 +100,7 @@ class JavaObjectMapperTest {
 	@DisplayName("Map Pojo with a field that is a list of objects.")
 	@Test
 	void testListOfSubPropertyMapping() throws JsonProcessingException {
-		String expectedJson = "{\"@context\":\"https://smartdatamodels.org/context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"mySubProperty\":{\"value\":[{\"propertyName\":\"My property 1\"},{\"propertyName\":\"My property 2\"}],\"type\":\"Property\"}}";
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"mySubProperty\":{\"value\":[{\"propertyName\":\"My property 1\"},{\"propertyName\":\"My property 2\"}],\"type\":\"Property\"}}";
 
 		MyPojoWithListOfSubProperty myComplexPojo = new MyPojoWithListOfSubProperty(
 				"urn:ngsi-ld:complex-pojo:the-test-pojo");
@@ -117,7 +117,7 @@ class JavaObjectMapperTest {
 	@DisplayName("Map Pojo with a field that is a relationship.")
 	@Test
 	void testSubEntityMapping() throws JsonProcessingException {
-		String expectedJson = "{\"@context\":\"https://smartdatamodels.org/context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity\":{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\"}}";
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity\":{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\"}}";
 
 		MySubPropertyEntity mySubProperty = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:the-sub-entity");
 		MyPojoWithSubEntity myComplexPojo = new MyPojoWithSubEntity("urn:ngsi-ld:complex-pojo:the-test-pojo");
@@ -129,7 +129,7 @@ class JavaObjectMapperTest {
 	@DisplayName("Map Pojo with a field that is a relationship with additional attributes.")
 	@Test
 	void testSubEntityEmbedMapping() throws JsonProcessingException {
-		String expectedJson = "{\"@context\":\"https://smartdatamodels.org/context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity\":{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"role\":{\"value\":\"Sub-Entity\",\"type\":\"Property\"}}}";
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity\":{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"role\":{\"value\":\"Sub-Entity\",\"type\":\"Property\"}}}";
 
 		MySubPropertyEntityEmbed mySubProperty = new MySubPropertyEntityEmbed("urn:ngsi-ld:sub-entity:the-sub-entity");
 		MyPojoWithSubEntityEmbed myComplexPojo = new MyPojoWithSubEntityEmbed("urn:ngsi-ld:complex-pojo:the-test-pojo");
@@ -141,7 +141,7 @@ class JavaObjectMapperTest {
 	@DisplayName("Map Pojo with a field that is a relationship-list.")
 	@Test
 	void testEntityWithRelationShipList() throws JsonProcessingException {
-		String expectedJson = "{\"@context\":\"https://smartdatamodels.org/context.jsonld\",\"id\":\"urn:ngsi-ld:sub-entity-pojo:the-parent\",\"type\":\"complex-pojo\",\"sub-entity\":[{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\"}]}";
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:sub-entity-pojo:the-parent\",\"type\":\"complex-pojo\",\"sub-entity\":[{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\"}]}";
 		MySubPropertyEntity mySubEntity = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:the-sub-entity");
 		MyPojoWithListOfSubEntity myPojoWithListOfSubEntity = new MyPojoWithListOfSubEntity(
 				"urn:ngsi-ld:sub-entity-pojo:the-parent");
@@ -242,7 +242,7 @@ class JavaObjectMapperTest {
 	@DisplayName("Pojo with null relationship-list should be mapped.")
 	@Test
 	void testWithNullListRelList() throws JsonProcessingException {
-		String expectedJson = "{\"@context\":\"https://smartdatamodels.org/context.jsonld\",\"id\":\"urn:ngsi-ld:entity:the-entity\",\"type\":\"complex-pojo\"}";
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:entity:the-entity\",\"type\":\"complex-pojo\"}";
 		MyPojoWithListOfSubEntity myPojoWithListOfSubEntity = new MyPojoWithListOfSubEntity(
 				"urn:ngsi-ld:entity:the-entity");
 		myPojoWithListOfSubEntity.setMySubProperty(null);
@@ -254,7 +254,7 @@ class JavaObjectMapperTest {
 	@DisplayName("Pojo with null entry in relationship-list should be mapped.")
 	@Test
 	void testWithNullInRelList() throws JsonProcessingException {
-		String expectedJson = "{\"@context\":\"https://smartdatamodels.org/context.jsonld\",\"id\":\"urn:ngsi-ld:entity:the-entity\",\"type\":\"complex-pojo\",\"sub-entity\":[]}";
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:entity:the-entity\",\"type\":\"complex-pojo\",\"sub-entity\":[]}";
 		MyPojoWithListOfSubEntity myPojoWithListOfSubEntity = new MyPojoWithListOfSubEntity(
 				"urn:ngsi-ld:entity:the-entity");
 		List<MySubPropertyEntity> listWithNull = new ArrayList<>();
