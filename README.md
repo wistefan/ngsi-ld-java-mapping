@@ -77,7 +77,7 @@ the [NGSI-LD](https://docbox.etsi.org/isg/cim/open/Latest%20release%20NGSI-LD%20
 
 ```json
 {
-  "@context": "https://smartdatamodels.org/context.jsonld",
+  "@context": "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld",
   "id": "urn:ngsi-ld:my-pojo:the-test-pojo",
   "type": "my-pojo",
   "numbers": {
@@ -156,7 +156,7 @@ The sub-property will be translated into a plain json-object:
 
 ```json
 {
-  "@context": "https://smartdatamodels.org/context.jsonld",
+  "@context": "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld",
   "id": "urn:ngsi-ld:complex-pojo:the-test-pojo",
   "type": "complex-pojo",
   "mySubProperty": {
@@ -180,7 +180,7 @@ Note that the setter-annotation now has to contain the value ```targetClass``` t
 
 ```json
 {
-	"@context": "https://smartdatamodels.org/context.jsonld",
+	"@context": "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld",
 	"id": "urn:ngsi-ld:complex-pojo:the-test-pojo",
 	"type": "complex-pojo",
 	"mySubProperty": {
@@ -240,7 +240,7 @@ The only difference to the already known is the ```AttributeType.RELATIONSHIP```
 The resulting object looks as following:
 ```json
 {
-	"@context": "https://smartdatamodels.org/context.jsonld",
+	"@context": "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld",
 	"id": "urn:ngsi-ld:complex-pojo:the-test-pojo",
 	"type": "complex-pojo",
 	"sub-entity": {
@@ -263,7 +263,7 @@ private String role = "Sub-Entity";
 This role will be added to the relationship:
 ```json
 {
-  "@context": "https://smartdatamodels.org/context.jsonld",
+  "@context": "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld",
   "id": "urn:ngsi-ld:complex-pojo:the-test-pojo",
   "type": "complex-pojo",
   "sub-entity": {
@@ -288,7 +288,7 @@ In case of the previous example:
 > :mag: [EntityVOMapperTest](src/test/java/io/github/wistefan/mapping/desc/EntityVOMapperTest.java) - Map entity containing a relationship.
 ```json
 {
-	"@context": "https://smartdatamodels.org/context.jsonld",
+	"@context": "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld",
 	"id": "urn:ngsi-ld:complex-pojo:the-test-pojo",
 	"type": "complex-pojo",
 	"sub-entity": {
@@ -301,7 +301,7 @@ In case of the previous example:
 The entity ```urn:ngsi-ld:sub-entity:the-sub-entity``` also has to exist within the broker:
 ```json
 {
-	"@context": "https://smartdatamodels.org/context.jsonld",
+	"@context": "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld",
 	"id": "urn:ngsi-ld:sub-entity:the-sub-entity",
 	"type": "sub-entity",
 	"name": {
@@ -333,7 +333,7 @@ The resulting object will then look as following(json for better readability):
 Reading out embedded properties(again, same example), instead of the related entity achieved(f.e. if a generic object is used):
 ```json
 {
-  "@context": "https://smartdatamodels.org/context.jsonld",
+  "@context": "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld",
   "id": "urn:ngsi-ld:complex-pojo:the-test-pojo",
   "type": "complex-pojo",
   "sub-entity": {
