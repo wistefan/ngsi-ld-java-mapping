@@ -1171,9 +1171,9 @@ components:
           Property: '#/components/schemas/Property'
           GeoProperty: '#/components/schemas/GeoProperty'
           Relationship: '#/components/schemas/Relationship'
-        properties:
-          type:
-            $ref: '#/components/schemas/PropertyType'
+      properties:
+        type:
+          $ref: '#/components/schemas/PropertyType'
       oneOf:
         - $ref: '#/components/schemas/Property'
         - $ref: '#/components/schemas/GeoProperty'

@@ -1,5 +1,6 @@
 package io.github.wistefan.mapping.desc.pojos;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.github.wistefan.mapping.annotations.AttributeGetter;
 import io.github.wistefan.mapping.annotations.AttributeSetter;
 import io.github.wistefan.mapping.annotations.AttributeType;
@@ -13,6 +14,7 @@ public class MySimplePojo {
 	private List<Integer> numbers;
 
 	@EntityType
+	@JsonIgnore
 	public String getType() {
 		return ENTITY_TYPE;
 	}
