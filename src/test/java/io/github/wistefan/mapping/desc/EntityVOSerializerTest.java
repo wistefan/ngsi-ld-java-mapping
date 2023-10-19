@@ -39,6 +39,7 @@ public class EntityVOSerializerTest {
 
         Optional<EntityVO> d1 = entityVOSerializer.deserialize(s1.get(), EntityVO.class);
         Assertions.assertTrue(d1.isPresent());
+        Assertions.assertEquals(entityVO.getLocation().getType(), d1.get().getLocation().getType());
 
         Optional<byte[]> s2 = entityVOSerializer.serialize(List.of(entityVO));
         Assertions.assertTrue(s2.isPresent());
@@ -57,6 +58,7 @@ public class EntityVOSerializerTest {
 
         Optional<MySimplePojo> d1 = entityVOSerializer.deserialize(s1.get(), MySimplePojo.class);
         Assertions.assertTrue(d1.isPresent());
+        Assertions.assertEquals(pojo, d1.get());
     }
 
     @Test
@@ -70,5 +72,6 @@ public class EntityVOSerializerTest {
 
         Optional<?> d1 = entityVOSerializer.deserialize(s1.get(), Argument.of(List.class, MySimplePojo.class));
         Assertions.assertTrue(d1.isPresent());
+        Assertions.assertEquals(List.of(pojo), d1.get());
     }
 }

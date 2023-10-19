@@ -5,9 +5,13 @@ import io.github.wistefan.mapping.annotations.AttributeGetter;
 import io.github.wistefan.mapping.annotations.AttributeSetter;
 import io.github.wistefan.mapping.annotations.AttributeType;
 import io.github.wistefan.mapping.annotations.EntityType;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 
 import java.util.List;
 
+@EqualsAndHashCode
+@ToString
 public class MySimplePojo {
 	private static final String ENTITY_TYPE = "my-pojo";
 	private String myName;
@@ -38,4 +42,5 @@ public class MySimplePojo {
 	public void setNumbers(List<Integer> numbers) {
 		this.numbers = numbers;
 	}
+
 }
