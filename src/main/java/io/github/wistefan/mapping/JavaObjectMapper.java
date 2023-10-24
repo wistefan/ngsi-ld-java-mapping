@@ -44,17 +44,12 @@ public class JavaObjectMapper extends Mapper {
 
 	private static final String DEFAULT_CONTEXT = "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld";
 
-	/**
-	 * Context to be used for the entities.
-	 */
-	private final String entityContext;
+	private final MappingProperties mappingProperties;
 
 	public static final String NO_MAPPING_DEFINED_FOR_METHOD_TEMPLATE = "No mapping defined for method %s";
 	public static final String WAS_NOT_ABLE_INVOKE_METHOD_TEMPLATE = "Was not able invoke method %s on %s";
 
-	public JavaObjectMapper() {
-		this.entityContext = DEFAULT_CONTEXT;
-	}
+
 
 	/**
 	 * Translate the attribute path for the given object into the path in the ngsi-ld model.
@@ -243,7 +238,7 @@ public class JavaObjectMapper extends Mapper {
 			List<Method> relationshipMethods, List<Method> relationshipListMethods) {
 
 		EntityVO entityVO = new EntityVO();
-		entityVO.setAtContext(entityContext);
+		entityVO.setAtContext(mappingProperties.getContextUrl());
 
 		// TODO: include extraction via annotation for all well-known attributes
 		entityVO.setOperationSpace(null);

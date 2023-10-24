@@ -3,6 +3,7 @@ package io.github.wistefan.mapping.desc;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.wistefan.mapping.MappingProperties;
 import io.github.wistefan.mapping.NgsiLdAttribute;
 import io.github.wistefan.mapping.QueryAttributeType;
 import io.github.wistefan.mapping.desc.pojos.MyMultiTypePojo;
@@ -59,7 +60,7 @@ class JavaObjectMapperTest {
 
 	@BeforeEach
 	public void setup() {
-		javaObjectMapper = new JavaObjectMapper();
+		javaObjectMapper = new JavaObjectMapper(new MappingProperties());
 		OBJECT_MAPPER.setSerializationInclusion(JsonInclude.Include.NON_NULL);
 		OBJECT_MAPPER
 				.addMixIn(AdditionalPropertyVO.class, AdditionalPropertyMixin.class);
