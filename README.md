@@ -11,7 +11,7 @@ like [jackson](https://github.com/FasterXML/jackson) for JSON-Java,
 [mapstruct](https://mapstruct.org/) for Java-Java or [Hibernate](https://hibernate.org/) for Java-Database, it uses an annotation-based approach. A set of specific [annotations](src/main/java/io/github/wistefan/mapping/annotations) is
 provided, that needs to be used for describing the object mappings.
 
-## Usage
+## Usage 
 
 In order to enable the mappers to translate correctly between both worlds, the domain object has to be annotated properly.
 

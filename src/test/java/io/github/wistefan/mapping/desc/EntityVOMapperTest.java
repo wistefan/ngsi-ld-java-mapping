@@ -297,7 +297,6 @@ class EntityVOMapperTest {
 
         assertEquals(
             Map.ofEntries(
-                Map.entry("type", pojo.getType()),
                 Map.entry("myName", pojo.getMyName()),
                 Map.entry("numbers", pojo.getNumbers())
             ),
