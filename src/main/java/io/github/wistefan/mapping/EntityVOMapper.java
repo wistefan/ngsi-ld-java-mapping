@@ -509,9 +509,7 @@ public class EntityVOMapper extends Mapper {
                 T theObject = objectConstructor.newInstance(relationshipVO.getObject().toString());
                 // return the empty object
                 return Mono.just(theObject);
-            } catch (NoSuchMethodException e) {
-                return Mono.error(new MappingException(String.format("Requested class %s does not have the required string constructor.", targetClass), e));
-            } catch (InvocationTargetException | InstantiationException | IllegalAccessException e) {
+            } catch (InvocationTargetException | InstantiationException | IllegalAccessException | NoSuchMethodException e) {
                 return Mono.error(new MappingException(String.format("Was not able to instantiate %s with a string parameter.", targetClass), e));
             }
         } else if (optionalEntityVO.isEmpty()) {
