@@ -2,10 +2,7 @@ package io.github.wistefan.mapping.desc;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.wistefan.mapping.AdditionalPropertyMixin;
-import io.github.wistefan.mapping.EntitiesRepository;
-import io.github.wistefan.mapping.EntityVOMapper;
-import io.github.wistefan.mapping.MappingException;
+import io.github.wistefan.mapping.*;
 import io.github.wistefan.mapping.desc.pojos.*;
 import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithSubEntityWellKnown;
 import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithWrongConstructor;
@@ -37,7 +34,7 @@ class EntityVOMapperTest {
 
     @BeforeEach
     public void setup() {
-        entityVOMapper = new EntityVOMapper(OBJECT_MAPPER, entitiesRepository);
+        entityVOMapper = new EntityVOMapper(new MappingProperties(), OBJECT_MAPPER, entitiesRepository);
         OBJECT_MAPPER
                 .addMixIn(AdditionalPropertyVO.class, AdditionalPropertyMixin.class);
     }
