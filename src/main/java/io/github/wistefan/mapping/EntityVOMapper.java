@@ -504,7 +504,16 @@ public class EntityVOMapper extends Mapper {
     private <T> Mono<T> getObjectFromRelationship(RelationshipVO relationshipVO, Class<T> targetClass, Map<String, EntityVO> relationShipEntitiesMap, Map<String, AdditionalPropertyVO> additionalPropertyVOMap) {
         Optional<EntityVO> optionalEntityVO = Optional.ofNullable(relationShipEntitiesMap.get(relationshipVO.getObject().toString()));
         if (optionalEntityVO.isEmpty() && !mappingProperties.isStrictRelationships()) {
-            return Mono.empty();
+            try {
+                Constructor<T> objectConstructor = targetClass.getDeclaredConstructor(String.class);
+                T theObject = objectConstructor.newInstance(relationshipVO.getObject().toString());
+                // return the empty object
+                return Mono.just(theObject);
+            } catch (NoSuchMethodException e) {
+                return Mono.error(new MappingException(String.format("Requested class %s does not have the required string constructor.", targetClass), e));
+            } catch (InvocationTargetException | InstantiationException | IllegalAccessException e) {
+                return Mono.error(new MappingException(String.format("Was not able to instantiate %s with a string parameter.", targetClass), e));
+            }
         } else if (optionalEntityVO.isEmpty()) {
             return Mono.error(new MappingException(String.format("Was not able to resolve the relationship %s", relationshipVO.getObject())));
         }

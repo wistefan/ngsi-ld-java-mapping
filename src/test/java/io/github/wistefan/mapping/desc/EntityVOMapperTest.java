@@ -32,9 +32,12 @@ class EntityVOMapperTest {
     private EntityVOMapper entityVOMapper;
     private EntitiesRepository entitiesRepository = mock(EntitiesRepository.class);
 
+    private MappingProperties mappingProperties;
+
     @BeforeEach
     public void setup() {
-        entityVOMapper = new EntityVOMapper(new MappingProperties(), OBJECT_MAPPER, entitiesRepository);
+        mappingProperties = new MappingProperties();
+        entityVOMapper = new EntityVOMapper(mappingProperties, OBJECT_MAPPER, entitiesRepository);
         OBJECT_MAPPER
                 .addMixIn(AdditionalPropertyVO.class, AdditionalPropertyMixin.class);
     }
@@ -58,6 +61,36 @@ class EntityVOMapperTest {
         MyPojoWithSubEntity myPojoWithSubEntity = entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntity.class).block();
         assertEquals(expectedPojo, myPojoWithSubEntity, "The full pojo should be retrieved.");
     }
+
+    @DisplayName("Map entity containing a relationship that could not be resolved with strict-mapping disabled.")
+    @Test
+    void testSubEntityMappingNoStrict() throws JsonProcessingException {
+        mappingProperties.setStrictRelationships(false);
+        MySubPropertyEntity expectedSubEntity = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:the-sub-entity");
+        MyPojoWithSubEntity expectedPojo = new MyPojoWithSubEntity("urn:ngsi-ld:complex-pojo:the-test-pojo");
+        expectedPojo.setMySubProperty(expectedSubEntity);
+
+        when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of()));
+
+        String parentEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity\":{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"datasetId\":\"urn:ngsi-ld:sub-entity:the-sub-entity\"}}";
+        EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
+
+        MyPojoWithSubEntity myPojoWithSubEntity = entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntity.class).block();
+        assertEquals(expectedPojo, myPojoWithSubEntity, "The full pojo should be retrieved.");
+    }
+
+    @DisplayName("Fail entity containing a relationship that could not be resolved with strict-mapping enabled.")
+    @Test
+    void testSubEntityMappingStrict() throws JsonProcessingException {
+        mappingProperties.setStrictRelationships(true);
+        when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of()));
+
+        String parentEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity\":{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"datasetId\":\"urn:ngsi-ld:sub-entity:the-sub-entity\"}}";
+        EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
+
+        assertThrows(MappingException.class, () -> entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntity.class).block(), "For strict-mapping, an exception should be thrown.");
+    }
+
 
     @DisplayName("Map entity containing a relationship with embedded values.")
     @Test
@@ -293,10 +326,10 @@ class EntityVOMapperTest {
         pojo.setNumbers(List.of());
 
         assertEquals(
-            Map.ofEntries(
-                Map.entry("myName", pojo.getMyName()),
-                Map.entry("numbers", pojo.getNumbers())
-            ),
-            entityVOMapper.convertEntityToMap(pojo));
+                Map.ofEntries(
+                        Map.entry("myName", pojo.getMyName()),
+                        Map.entry("numbers", pojo.getNumbers())
+                ),
+                entityVOMapper.convertEntityToMap(pojo));
     }
 }
