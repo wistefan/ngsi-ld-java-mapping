@@ -14,4 +14,9 @@ public class MappingProperties {
 	 * ContextUrl for the service to use.
 	 */
 	private String contextUrl = "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld";
+
+	/**
+	 * When set to true, mapping will fail if a realtionship cannot be resolved.
+	 */
+	private boolean strictRelationships = true;
 }
