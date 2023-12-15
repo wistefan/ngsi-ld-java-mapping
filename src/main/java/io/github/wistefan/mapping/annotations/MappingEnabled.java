@@ -16,4 +16,9 @@ public @interface MappingEnabled {
 	 * Supported entity types for the mapping. E.g. which ngsi-ld entity types can be mapped to the object.
 	 */
 	String[] entityType() default {""};
+
+	/**
+	 * Supported subscription type for the mapping. E.g. which ngsi-ld subscription type can be mapped to the object.
+	 */
+	String subscriptionType() default "";
 }

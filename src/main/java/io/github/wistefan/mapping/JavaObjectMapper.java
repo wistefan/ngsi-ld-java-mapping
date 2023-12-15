@@ -1,36 +1,16 @@
 package io.github.wistefan.mapping;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.wistefan.mapping.annotations.AttributeGetter;
-import io.github.wistefan.mapping.annotations.AttributeSetter;
-import io.github.wistefan.mapping.annotations.AttributeType;
-import io.github.wistefan.mapping.annotations.DatasetId;
-import io.github.wistefan.mapping.annotations.EntityId;
-import io.github.wistefan.mapping.annotations.EntityType;
-import io.github.wistefan.mapping.annotations.RelationshipObject;
+import io.github.wistefan.mapping.annotations.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.fiware.ngsi.model.AdditionalPropertyVO;
-import org.fiware.ngsi.model.EntityVO;
-import org.fiware.ngsi.model.GeoPropertyVO;
-import org.fiware.ngsi.model.PropertyListVO;
-import org.fiware.ngsi.model.PropertyVO;
-import org.fiware.ngsi.model.RelationshipListVO;
-import org.fiware.ngsi.model.RelationshipVO;
+import org.fiware.ngsi.model.*;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
-import java.util.AbstractMap;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -169,7 +149,7 @@ public class JavaObjectMapper extends Mapper {
      *
      * @param entity the object representing the entity
      * @param <T>    class of the entity
-     * @return the NGIS-LD entity objet
+     * @return the NGSI-LD entity object
      */
     public <T> EntityVO toEntityVO(T entity) {
         isMappingEnabled(entity.getClass())
@@ -226,7 +206,7 @@ public class JavaObjectMapper extends Mapper {
                 geoPropertyMethods, relationshipMethods, relationshipListMethods);
     }
 
-    /**
+	/**
      * Build the entity from its declared methods.
      */
     private <T> EntityVO buildEntity(T entity, Method entityIdMethod, Method entityTypeMethod,

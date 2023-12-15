@@ -8,6 +8,9 @@ import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithSubEntityWellKnow
 import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithWrongConstructor;
 import io.github.wistefan.mapping.desc.pojos.invalid.MySetterThrowingPojo;
 import io.github.wistefan.mapping.desc.pojos.invalid.MyThrowingConstructor;
+import io.github.wistefan.mapping.desc.pojos.subscription.MyNotificationParamsEndpointProperty;
+import io.github.wistefan.mapping.desc.pojos.subscription.MyNotificationParamsProperty;
+import io.github.wistefan.mapping.desc.pojos.subscription.MySubscriptionPojo;
 import org.fiware.ngsi.model.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,8 +22,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Matchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -331,5 +333,67 @@ class EntityVOMapperTest {
                         Map.entry("numbers", pojo.getNumbers())
                 ),
                 entityVOMapper.convertEntityToMap(pojo));
+    }
+
+    @Test
+    void testReadingNotificationFromJson() throws JsonProcessingException {
+        String json = """
+                {
+                  "id": "urn:ngsi-ld:Notification:4233e3ca-50c3-11ee-8433-0a580a826912",
+                  "type": "Notification",
+                  "subscriptionId": "urn:ngsi-ld:subscription:567f4788-50bf-11ee-94e9-0a580a826911",
+                  "notifiedAt": "2023-09-11T16:50:05.456Z",
+                  "data": [
+                    {
+                      "id": "urn:ngsi-ld:product:4d0964a4-2341-4676-a551-de5115ccf98d",
+                      "type": "product",
+                      "deletedAt": "2023-09-11T16:50:05.456Z"
+                    }
+                  ]
+                }""";
+        NotificationVO notificationVO = entityVOMapper.readNotificationFromJSON(json);
+
+        assertNotNull(notificationVO);
+        assertEquals("Notification", notificationVO.getType());
+    }
+
+    @DisplayName("Query mapping")
+    @Test
+    void testQueryMapping() {
+        MySubscriptionPojo myPojo = createSubscription();
+
+        assertEquals(myPojo.getQ(), entityVOMapper.toSubscriptionVO(myPojo).getQ(),
+                "The pojo should have the same query");
+    }
+
+    @DisplayName("Notification endpoint mapping")
+    @Test
+    void testNotificationEndpointMapping() {
+        MySubscriptionPojo myPojo = createSubscription();
+
+        assertEquals(myPojo.getNotification().getEndpoint().getUri(), entityVOMapper.toSubscriptionVO(myPojo).getNotification().getEndpoint().getUri(),
+                "The pojo should have the same notification endpoint");
+    }
+
+    private MySubscriptionPojo createSubscription() {
+        MySubscriptionPojo myPojo = new MySubscriptionPojo("urn:ngsi-ld:my-pojo:the-test-pojo");
+        myPojo.setQ("eventType=custom");
+        myPojo.setNotification(createNotification());
+
+        return myPojo;
+    }
+
+    private MyNotificationParamsEndpointProperty createEndpoint() {
+        MyNotificationParamsEndpointProperty endpointProperty = new MyNotificationParamsEndpointProperty();
+        endpointProperty.setUri(URI.create("test.com"));
+        endpointProperty.setAccept("application/ld+json");
+        return endpointProperty;
+    }
+
+    private MyNotificationParamsProperty createNotification() {
+        MyNotificationParamsProperty notificationParamsProperty = new MyNotificationParamsProperty();
+        notificationParamsProperty.setEndpoint(createEndpoint());
+        notificationParamsProperty.setFormat("keyValues");
+        return notificationParamsProperty;
     }
 }

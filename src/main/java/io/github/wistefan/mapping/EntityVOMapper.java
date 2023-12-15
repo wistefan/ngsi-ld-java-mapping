@@ -1,7 +1,9 @@
 package io.github.wistefan.mapping;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import io.github.wistefan.mapping.annotations.AttributeSetter;
 import io.github.wistefan.mapping.annotations.AttributeType;
 import io.github.wistefan.mapping.annotations.MappingEnabled;
@@ -35,6 +37,10 @@ public class EntityVOMapper extends Mapper {
         this.entitiesRepository = entitiesRepository;
         this.objectMapper
                 .addMixIn(AdditionalPropertyVO.class, AdditionalPropertyMixin.class);
+
+        this.objectMapper.registerModule(new SimpleModule().addDeserializer(GeoQueryVO.class,
+                new GeoQueryDeserializer()));
+
         this.objectMapper.findAndRegisterModules();
     }
 
@@ -47,6 +53,25 @@ public class EntityVOMapper extends Mapper {
     public <T> Map<String, Object> convertEntityToMap(T entity) {
         return objectMapper.convertValue(entity, new TypeReference<>() {
         });
+    }
+
+    /**
+     * Translate the given object into a Subscription.
+     *
+     * @param subscription the object representing the subscription
+     * @param <T>    class of the subscription
+     * @return the NGSI-LD subscription object
+     */
+    public <T> SubscriptionVO toSubscriptionVO(T subscription) {
+        isMappingEnabled(subscription.getClass())
+                .orElseThrow(() -> new UnsupportedOperationException(
+                        String.format("Generic mapping to NGSI-LD subscriptions is not supported for object %s",
+                                subscription)));
+
+        SubscriptionVO subscriptionVO = objectMapper.convertValue(subscription, SubscriptionVO.class);
+        subscriptionVO.setAtContext(mappingProperties.getContextUrl());
+
+        return subscriptionVO;
     }
 
     /**
@@ -126,6 +151,11 @@ public class EntityVOMapper extends Mapper {
         } catch (InvocationTargetException | InstantiationException | IllegalAccessException e) {
             return Mono.error(new MappingException(String.format("Was not able to create instance of %s.", targetClass), e));
         }
+    }
+
+
+    public NotificationVO readNotificationFromJSON(String json) throws JsonProcessingException {
+        return objectMapper.readValue(json, NotificationVO.class);
     }
 
     /**
