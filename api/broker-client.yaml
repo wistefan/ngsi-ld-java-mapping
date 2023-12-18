@@ -1457,6 +1457,7 @@ components:
           type: string
           enum:
             - application/ld+json
+            - application/json
         receiverInfo:
           type: array
           items:
