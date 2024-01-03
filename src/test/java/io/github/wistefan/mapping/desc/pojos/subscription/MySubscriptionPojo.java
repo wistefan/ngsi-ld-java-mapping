@@ -14,9 +14,9 @@ import java.util.Set;
 @EqualsAndHashCode
 @ToString
 @Getter
-@MappingEnabled(subscriptionType = "Subscription")
+@MappingEnabled(entityType = MySubscriptionPojo.ENTITY_TYPE)
 public class MySubscriptionPojo {
-	private static final String SUBSCRIPTION_TYPE = "Subscription";
+	public static final String ENTITY_TYPE = "Subscription";
 
 	private final URI id;
 	private final String type;
@@ -26,7 +26,7 @@ public class MySubscriptionPojo {
 
 	public MySubscriptionPojo(String id) {
 		this.id = URI.create(id);
-		this.type = SUBSCRIPTION_TYPE;
+		this.type = ENTITY_TYPE;
 	}
 
 	@Setter
