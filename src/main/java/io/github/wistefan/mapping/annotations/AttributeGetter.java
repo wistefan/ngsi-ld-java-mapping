@@ -6,7 +6,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Annotation to inidcate that a field should be mapped to an NGIS attribute.
+ * Annotation to indicate that a field should be mapped to an NGSI attribute.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)

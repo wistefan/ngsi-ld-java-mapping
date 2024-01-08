@@ -1149,6 +1149,9 @@ components:
     modifiedAt:
       type: string
       format: date-time
+    deletedAt:
+      type: string
+      format: date-time
     datasetId:
       type: string
       format: uri
@@ -1285,6 +1288,8 @@ components:
           $ref: '#/components/schemas/createdAt'
         modifiedAt:
           $ref: '#/components/schemas/modifiedAt'
+        deletedAt:
+          $ref: '#/components/schemas/deletedAt'
       additionalProperties:
         $ref: '#/components/schemas/AdditionalProperty'
     PropertyList:
@@ -1319,6 +1324,8 @@ components:
           $ref: '#/components/schemas/createdAt'
         modifiedAt:
           $ref: '#/components/schemas/modifiedAt'
+        deletedAt:
+          $ref: '#/components/schemas/deletedAt'
       additionalProperties:
         $ref: '#/components/schemas/AdditionalProperty'
     EntityList:
@@ -1428,6 +1435,16 @@ components:
           $ref: '#/components/schemas/GeoQuery'
         csf:
           type: string
+    KeyValuePair:
+      type: object
+      required:
+        - key
+        - value
+      properties:
+        key:
+          type: string
+        value:
+          type: string
     Endpoint:
       type: object
       required:
@@ -1440,6 +1457,11 @@ components:
           type: string
           enum:
             - application/ld+json
+            - application/json
+        receiverInfo:
+          type: array
+          items:
+            $ref: '#/components/schemas/KeyValuePair'
     NotificationParams:
       type: object
       properties:
@@ -1473,6 +1495,36 @@ components:
           format: date-time
       required:
         - endpoint
+    Notification:
+      type: object
+      properties:
+        '@context':
+          $ref: '#/components/schemas/LdContext'
+        id:
+          type: string
+          format: uri
+          example: 'urn:ngsi-ld:Notification:82fde8ac-50c2-11ee-b89e-0a580a826912'
+        type:
+          $ref: '#/components/schemas/Name'
+        subscriptionId:
+          type: string
+          format: uri
+          example: 'urn:ngsi-ld:subscription:567f4788-50bf-11ee-94e9-0a580a826911'
+        notifiedAt:
+          type: string
+          format: date-time
+          example: '2023-01-01T12:00:00.000Z'
+        data:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/Entity'
+      required:
+        - id
+        - type
+        - subscriptionId
+        - notifiedAt
+        - data
     Subscription:
       allOf:
         - $ref: '#/components/schemas/SubscriptionFragment'
