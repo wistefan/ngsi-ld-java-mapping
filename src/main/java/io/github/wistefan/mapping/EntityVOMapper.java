@@ -59,7 +59,7 @@ public class EntityVOMapper extends Mapper {
      * Translate the given object into a Subscription.
      *
      * @param subscription the object representing the subscription
-     * @param <T>    class of the subscription
+     * @param <T>          class of the subscription
      * @return the NGSI-LD subscription object
      */
     public <T> SubscriptionVO toSubscriptionVO(T subscription) {
@@ -460,13 +460,17 @@ public class EntityVOMapper extends Mapper {
      * @return a list of all referenced ids
      */
     private List<URI> getURIsFromRelationshipObject(AdditionalPropertyVO additionalPropertyVO) {
-        if (additionalPropertyVO instanceof RelationshipVO relationshipVO) {
+        Optional<RelationshipVO> optionalRelationshipVO = getRelationshipFromProperty(additionalPropertyVO);
+        if (optionalRelationshipVO.isPresent()) {
             // List.of() cannot be used, since we need a mutable list
             List<URI> uriList = new ArrayList<>();
-            uriList.add(relationshipVO.getObject());
+            uriList.add(optionalRelationshipVO.get().getObject());
             return uriList;
-        } else if (additionalPropertyVO instanceof RelationshipListVO relationshipList) {
-            return relationshipList.stream().flatMap(listEntry -> getURIsFromRelationshipObject(listEntry).stream()).toList();
+        }
+
+        Optional<RelationshipListVO> optionalRelationshipListVO = getRelationshipListFromProperty(additionalPropertyVO);
+        if (optionalRelationshipListVO.isPresent()) {
+            return optionalRelationshipListVO.get().stream().flatMap(listEntry -> getURIsFromRelationshipObject(listEntry).stream()).toList();
         }
         return List.of();
     }
@@ -480,14 +484,44 @@ public class EntityVOMapper extends Mapper {
      * @return a list of objects, mapping the relationship
      */
     private <T> Mono<List<T>> relationshipListToTargetClass(AdditionalPropertyVO entry, Class<T> targetClass, Map<String, EntityVO> relationShipEntitiesMap) {
-        if (entry instanceof RelationshipVO relationshipVO) {
-            return getObjectFromRelationship(relationshipVO, targetClass, relationShipEntitiesMap, relationshipVO.getAdditionalProperties())
-                    .map(List::of);
-        } else if (entry instanceof RelationshipListVO relationshipMap) {
-            return zipToList(relationshipMap.stream(), targetClass, relationShipEntitiesMap);
 
+        Optional<RelationshipVO> optionalRelationshipVO = getRelationshipFromProperty(entry);
+        if (optionalRelationshipVO.isPresent()) {
+            return getObjectFromRelationship(optionalRelationshipVO.get(), targetClass, relationShipEntitiesMap, optionalRelationshipVO.get().getAdditionalProperties())
+                    .map(List::of);
+        }
+
+        Optional<RelationshipListVO> optionalRelationshipListVO = getRelationshipListFromProperty(entry);
+        if (optionalRelationshipListVO.isPresent()) {
+            return zipToList(optionalRelationshipListVO.get().stream(), targetClass, relationShipEntitiesMap);
         }
         return Mono.error(new MappingException(String.format("Did not receive a valid entry: %s", entry)));
+    }
+
+    private Optional<RelationshipListVO> getRelationshipListFromProperty(AdditionalPropertyVO additionalPropertyVO) {
+        if (additionalPropertyVO instanceof RelationshipListVO rsl) {
+            return Optional.of(rsl);
+        } else if (additionalPropertyVO instanceof PropertyListVO propertyListVO && !propertyListVO.isEmpty() && isRelationship(propertyListVO.get(0))) {
+            RelationshipListVO relationshipListVO = new RelationshipListVO();
+            propertyListVO.stream()
+                    .map(propertyVO -> objectMapper.convertValue(propertyVO.getValue(), RelationshipVO.class))
+                    .forEach(relationshipListVO::add);
+            return Optional.of(relationshipListVO);
+        }
+        return Optional.empty();
+    }
+
+    private Optional<RelationshipVO> getRelationshipFromProperty(AdditionalPropertyVO additionalPropertyVO) {
+        if (additionalPropertyVO instanceof RelationshipVO relationshipVO) {
+            return Optional.of(relationshipVO);
+        } else if (additionalPropertyVO instanceof PropertyVO propertyVO && isRelationship(propertyVO)) {
+            return Optional.of(objectMapper.convertValue(propertyVO.getValue(), RelationshipVO.class));
+        }
+        return Optional.empty();
+    }
+
+    private boolean isRelationship(PropertyVO testProperty) {
+        return testProperty.getValue() instanceof Map<?, ?> valuesMap && valuesMap.get("type").equals(PropertyTypeVO.RELATIONSHIP.getValue());
     }
 
     /**
@@ -539,7 +573,8 @@ public class EntityVOMapper extends Mapper {
                 T theObject = objectConstructor.newInstance(relationshipVO.getObject().toString());
                 // return the empty object
                 return Mono.just(theObject);
-            } catch (InvocationTargetException | InstantiationException | IllegalAccessException | NoSuchMethodException e) {
+            } catch (InvocationTargetException | InstantiationException | IllegalAccessException |
+                     NoSuchMethodException e) {
                 return Mono.error(new MappingException(String.format("Was not able to instantiate %s with a string parameter.", targetClass), e));
             }
         } else if (optionalEntityVO.isEmpty()) {
