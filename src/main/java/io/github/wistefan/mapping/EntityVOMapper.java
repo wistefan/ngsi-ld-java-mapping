@@ -272,20 +272,21 @@ public class EntityVOMapper extends Mapper {
     private <T> Mono<T> handleRelationshipList(AdditionalPropertyVO attributeValue, T objectUnderConstruction, Map<String, EntityVO> relationShipMap, Method setter, AttributeSetter setterAnnotation) {
         Class<?> targetClass = setterAnnotation.targetClass();
         if (setterAnnotation.fromProperties()) {
-            if (attributeValue instanceof RelationshipVO singlePropertyMap) {
-                return relationshipFromProperties(singlePropertyMap, targetClass)
+            Optional<RelationshipVO> optionalRelationshipVO = getRelationshipFromProperty(attributeValue);
+            Optional<RelationshipListVO> optionalRelationshipListVO = getRelationshipListFromProperty(attributeValue);
+            if (optionalRelationshipVO.isPresent()) {
+                return relationshipFromProperties(optionalRelationshipVO.get(), targetClass)
                         .flatMap(relationship -> {
                             // we return the constructed object, since invoke most likely returns null, which is not allowed on mapper functions
                             // a list is created, since we have a relationship-list defined by the annotation
                             return invokeWithExceptionHandling(setter, objectUnderConstruction, List.of(relationship));
                         });
-            } else if (attributeValue instanceof RelationshipListVO multiPropertyList) {
-                return Mono.zip(multiPropertyList.stream().map(relationshipVO -> relationshipFromProperties(relationshipVO, targetClass)).toList(),
+            } else if (optionalRelationshipListVO.isPresent()) {
+                return Mono.zip(optionalRelationshipListVO.get().stream().map(relationshipVO -> relationshipFromProperties(relationshipVO, targetClass)).toList(),
                         oList -> Arrays.asList(oList).stream().map(targetClass::cast).toList()).flatMap(relationshipList -> {
                     // we return the constructed object, since invoke most likely returns null, which is not allowed on mapper functions
                     return invokeWithExceptionHandling(setter, objectUnderConstruction, relationshipList);
                 });
-
             } else {
                 return Mono.error(new MappingException(String.format("Value of the relationship %s is invalid.", attributeValue)));
             }
