@@ -496,7 +496,7 @@ public class EntityVOMapper extends Mapper {
         if (optionalRelationshipListVO.isPresent()) {
             return zipToList(optionalRelationshipListVO.get().stream(), targetClass, relationShipEntitiesMap);
         }
-        return Mono.error(new MappingException(String.format("Did not receive a valid entry: %s", entry)));
+        return Mono.just(List.of());
     }
 
     private Optional<RelationshipListVO> getRelationshipListFromProperty(AdditionalPropertyVO additionalPropertyVO) {
