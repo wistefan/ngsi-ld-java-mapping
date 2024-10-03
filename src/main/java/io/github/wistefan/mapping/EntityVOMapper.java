@@ -494,9 +494,13 @@ public class EntityVOMapper extends Mapper {
 
         Optional<RelationshipListVO> optionalRelationshipListVO = getRelationshipListFromProperty(entry);
         if (optionalRelationshipListVO.isPresent()) {
-            return zipToList(optionalRelationshipListVO.get().stream(), targetClass, relationShipEntitiesMap);
+            if (optionalRelationshipListVO.get().isEmpty()) {
+                return Mono.just(List.of());
+            } else {
+                return zipToList(optionalRelationshipListVO.get().stream(), targetClass, relationShipEntitiesMap);
+            }
         }
-        return Mono.just(List.of());
+        return Mono.error(new MappingException(String.format("Did not receive a valid entry: %s", entry)));
     }
 
     private Optional<RelationshipListVO> getRelationshipListFromProperty(AdditionalPropertyVO additionalPropertyVO) {
