@@ -287,6 +287,8 @@ public class EntityVOMapper extends Mapper {
                     // we return the constructed object, since invoke most likely returns null, which is not allowed on mapper functions
                     return invokeWithExceptionHandling(setter, objectUnderConstruction, relationshipList);
                 });
+            } else if (attributeValue instanceof PropertyVO pvo && pvo.getValue() instanceof List<?> vl && vl.isEmpty()) {
+                return Mono.just(objectUnderConstruction);
             } else {
                 return Mono.error(new MappingException(String.format("Value of the relationship %s is invalid.", attributeValue)));
             }
