@@ -375,6 +375,25 @@ class EntityVOMapperTest {
                 "The pojo should have the same notification endpoint");
     }
 
+    @DisplayName("Map entity with duplicate relationship")
+    @Test
+    void testDuplicateRelationship() throws Exception {
+        MySubPropertyEntity expectedSubEntity = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:the-sub-entity");
+        MyPojoWithSubEntityList expectedPojo = new MyPojoWithSubEntityList("urn:ngsi-ld:complex-pojo:the-test-pojo");
+        expectedPojo.setMySubPropertyList(List.of(expectedSubEntity, expectedSubEntity));
+
+        String subEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"sub-entity\",\"name\":{\"type\":\"Property\",\"value\":\"myName\"}}";
+        EntityVO subEntity = OBJECT_MAPPER.readValue(subEntityString, EntityVO.class);
+
+        when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of(subEntity, subEntity)));
+
+        String parentEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity-list\":[{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"datasetId\":\"urn:ngsi-ld:sub-entity:the-sub-entity\"},{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"datasetId\":\"urn:ngsi-ld:sub-entity:the-sub-entity\"}]}";
+        EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
+
+        MyPojoWithSubEntityList myPojoWithSubEntity = entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityList.class).block();
+        assertEquals(expectedPojo, myPojoWithSubEntity, "The full pojo should be retrieved.");
+    }
+
     private MySubscriptionPojo createSubscription() {
         MySubscriptionPojo myPojo = new MySubscriptionPojo("urn:ngsi-ld:my-pojo:the-test-pojo");
         myPojo.setQ("eventType=custom");
