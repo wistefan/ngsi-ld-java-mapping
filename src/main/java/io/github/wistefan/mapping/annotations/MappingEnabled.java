@@ -16,4 +16,5 @@ public @interface MappingEnabled {
 	 * Supported entity types for the mapping. E.g. which ngsi-ld entity types can be mapped to the object.
 	 */
 	String[] entityType() default {""};
+
 }

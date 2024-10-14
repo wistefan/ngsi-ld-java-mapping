@@ -2,15 +2,15 @@ package io.github.wistefan.mapping.desc;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.wistefan.mapping.AdditionalPropertyMixin;
-import io.github.wistefan.mapping.EntitiesRepository;
-import io.github.wistefan.mapping.EntityVOMapper;
-import io.github.wistefan.mapping.MappingException;
+import io.github.wistefan.mapping.*;
 import io.github.wistefan.mapping.desc.pojos.*;
 import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithSubEntityWellKnown;
 import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithWrongConstructor;
 import io.github.wistefan.mapping.desc.pojos.invalid.MySetterThrowingPojo;
 import io.github.wistefan.mapping.desc.pojos.invalid.MyThrowingConstructor;
+import io.github.wistefan.mapping.desc.pojos.subscription.MyNotificationParamsEndpointProperty;
+import io.github.wistefan.mapping.desc.pojos.subscription.MyNotificationParamsProperty;
+import io.github.wistefan.mapping.desc.pojos.subscription.MySubscriptionPojo;
 import org.fiware.ngsi.model.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -34,9 +34,12 @@ class EntityVOMapperTest {
     private EntityVOMapper entityVOMapper;
     private EntitiesRepository entitiesRepository = mock(EntitiesRepository.class);
 
+    private MappingProperties mappingProperties;
+
     @BeforeEach
     public void setup() {
-        entityVOMapper = new EntityVOMapper(OBJECT_MAPPER, entitiesRepository);
+        mappingProperties = new MappingProperties();
+        entityVOMapper = new EntityVOMapper(mappingProperties, OBJECT_MAPPER, entitiesRepository);
         OBJECT_MAPPER
                 .addMixIn(AdditionalPropertyVO.class, AdditionalPropertyMixin.class);
     }
@@ -98,6 +101,36 @@ class EntityVOMapperTest {
         MyPojoWithSubEntity myPojoWithSubEntity = entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntity.class).block();
         assertEquals(expectedPojo, myPojoWithSubEntity, "The full pojo should be retrieved.");
     }
+
+    @DisplayName("Map entity containing a relationship that could not be resolved with strict-mapping disabled.")
+    @Test
+    void testSubEntityMappingNoStrict() throws JsonProcessingException {
+        mappingProperties.setStrictRelationships(false);
+        MySubPropertyEntity expectedSubEntity = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:the-sub-entity");
+        MyPojoWithSubEntity expectedPojo = new MyPojoWithSubEntity("urn:ngsi-ld:complex-pojo:the-test-pojo");
+        expectedPojo.setMySubProperty(expectedSubEntity);
+
+        when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of()));
+
+        String parentEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity\":{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"datasetId\":\"urn:ngsi-ld:sub-entity:the-sub-entity\"}}";
+        EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
+
+        MyPojoWithSubEntity myPojoWithSubEntity = entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntity.class).block();
+        assertEquals(expectedPojo, myPojoWithSubEntity, "The full pojo should be retrieved.");
+    }
+
+    @DisplayName("Fail entity containing a relationship that could not be resolved with strict-mapping enabled.")
+    @Test
+    void testSubEntityMappingStrict() throws JsonProcessingException {
+        mappingProperties.setStrictRelationships(true);
+        when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of()));
+
+        String parentEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity\":{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"datasetId\":\"urn:ngsi-ld:sub-entity:the-sub-entity\"}}";
+        EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
+
+        assertThrows(MappingException.class, () -> entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntity.class).block(), "For strict-mapping, an exception should be thrown.");
+    }
+
 
     @DisplayName("Map entity containing a relationship with embedded values.")
     @Test
@@ -333,11 +366,91 @@ class EntityVOMapperTest {
         pojo.setNumbers(List.of());
 
         assertEquals(
-            Map.ofEntries(
-                Map.entry("type", pojo.getType()),
-                Map.entry("myName", pojo.getMyName()),
-                Map.entry("numbers", pojo.getNumbers())
-            ),
-            entityVOMapper.convertEntityToMap(pojo));
+                Map.ofEntries(
+                        Map.entry("myName", pojo.getMyName()),
+                        Map.entry("numbers", pojo.getNumbers())
+                ),
+                entityVOMapper.convertEntityToMap(pojo));
+    }
+
+    @Test
+    void testReadingNotificationFromJson() throws JsonProcessingException {
+        String json = """
+                {
+                  "id": "urn:ngsi-ld:Notification:4233e3ca-50c3-11ee-8433-0a580a826912",
+                  "type": "Notification",
+                  "subscriptionId": "urn:ngsi-ld:subscription:567f4788-50bf-11ee-94e9-0a580a826911",
+                  "notifiedAt": "2023-09-11T16:50:05.456Z",
+                  "data": [
+                    {
+                      "id": "urn:ngsi-ld:product:4d0964a4-2341-4676-a551-de5115ccf98d",
+                      "type": "product",
+                      "deletedAt": "2023-09-11T16:50:05.456Z"
+                    }
+                  ]
+                }""";
+        NotificationVO notificationVO = entityVOMapper.readNotificationFromJSON(json);
+
+        assertNotNull(notificationVO);
+        assertEquals("Notification", notificationVO.getType());
+    }
+
+    @DisplayName("Query mapping")
+    @Test
+    void testQueryMapping() {
+        MySubscriptionPojo myPojo = createSubscription();
+
+        assertEquals(myPojo.getQ(), entityVOMapper.toSubscriptionVO(myPojo).getQ(),
+                "The pojo should have the same query");
+    }
+
+    @DisplayName("Notification endpoint mapping")
+    @Test
+    void testNotificationEndpointMapping() {
+        MySubscriptionPojo myPojo = createSubscription();
+
+        assertEquals(myPojo.getNotification().getEndpoint().getUri(), entityVOMapper.toSubscriptionVO(myPojo).getNotification().getEndpoint().getUri(),
+                "The pojo should have the same notification endpoint");
+    }
+
+    @DisplayName("Map entity with duplicate relationship")
+    @Test
+    void testDuplicateRelationship() throws Exception {
+        MySubPropertyEntity expectedSubEntity = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:the-sub-entity");
+        MyPojoWithSubEntityList expectedPojo = new MyPojoWithSubEntityList("urn:ngsi-ld:complex-pojo:the-test-pojo");
+        expectedPojo.setMySubPropertyList(List.of(expectedSubEntity, expectedSubEntity));
+
+        String subEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"sub-entity\",\"name\":{\"type\":\"Property\",\"value\":\"myName\"}}";
+        EntityVO subEntity = OBJECT_MAPPER.readValue(subEntityString, EntityVO.class);
+
+        when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of(subEntity, subEntity)));
+
+        String parentEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity-list\":[{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"datasetId\":\"urn:ngsi-ld:sub-entity:the-sub-entity\"},{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"datasetId\":\"urn:ngsi-ld:sub-entity:the-sub-entity\"}]}";
+        EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
+
+        MyPojoWithSubEntityList myPojoWithSubEntity = entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityList.class).block();
+        assertEquals(expectedPojo, myPojoWithSubEntity, "The full pojo should be retrieved.");
+    }
+
+    private MySubscriptionPojo createSubscription() {
+        MySubscriptionPojo myPojo = new MySubscriptionPojo("urn:ngsi-ld:my-pojo:the-test-pojo");
+        myPojo.setQ("eventType=custom");
+        myPojo.setNotification(createNotification());
+
+        return myPojo;
+    }
+
+    private MyNotificationParamsEndpointProperty createEndpoint() {
+        MyNotificationParamsEndpointProperty endpointProperty = new MyNotificationParamsEndpointProperty();
+        endpointProperty.setUri(URI.create("test.com"));
+        endpointProperty.setAccept("application/ld+json");
+        return endpointProperty;
+    }
+
+    private MyNotificationParamsProperty createNotification() {
+        MyNotificationParamsProperty notificationParamsProperty = new MyNotificationParamsProperty();
+        notificationParamsProperty.setEndpoint(createEndpoint());
+        notificationParamsProperty.setFormat("keyValues");
+        return notificationParamsProperty;
     }
 }

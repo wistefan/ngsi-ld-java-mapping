@@ -1,7 +1,9 @@
 package io.github.wistefan.mapping;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import io.github.wistefan.mapping.annotations.AttributeSetter;
 import io.github.wistefan.mapping.annotations.AttributeType;
 import io.github.wistefan.mapping.annotations.MappingEnabled;
@@ -15,6 +17,9 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -25,25 +30,51 @@ import java.util.stream.Stream;
 @Singleton
 public class EntityVOMapper extends Mapper {
 
+    private final MappingProperties mappingProperties;
     private final ObjectMapper objectMapper;
     private final EntitiesRepository entitiesRepository;
 
-    public EntityVOMapper(ObjectMapper objectMapper, EntitiesRepository entitiesRepository) {
+    public EntityVOMapper(MappingProperties mappingProperties, ObjectMapper objectMapper, EntitiesRepository entitiesRepository) {
+        this.mappingProperties = mappingProperties;
         this.objectMapper = objectMapper;
         this.entitiesRepository = entitiesRepository;
         this.objectMapper
                 .addMixIn(AdditionalPropertyVO.class, AdditionalPropertyMixin.class);
+
+        this.objectMapper.registerModule(new SimpleModule().addDeserializer(GeoQueryVO.class,
+                new GeoQueryDeserializer()));
+
         this.objectMapper.findAndRegisterModules();
     }
 
     /**
      * Method to convert a Java-Object to Map representation
      *
-     * @param entity    the entity to be converted
+     * @param entity the entity to be converted
      * @return the converted map
      */
     public <T> Map<String, Object> convertEntityToMap(T entity) {
-        return objectMapper.convertValue(entity, new TypeReference<>() {});
+        return objectMapper.convertValue(entity, new TypeReference<>() {
+        });
+    }
+
+    /**
+     * Translate the given object into a Subscription.
+     *
+     * @param subscription the object representing the subscription
+     * @param <T>          class of the subscription
+     * @return the NGSI-LD subscription object
+     */
+    public <T> SubscriptionVO toSubscriptionVO(T subscription) {
+        isMappingEnabled(subscription.getClass())
+                .orElseThrow(() -> new UnsupportedOperationException(
+                        String.format("Generic mapping to NGSI-LD subscriptions is not supported for object %s",
+                                subscription)));
+
+        SubscriptionVO subscriptionVO = objectMapper.convertValue(subscription, SubscriptionVO.class);
+        subscriptionVO.setAtContext(mappingProperties.getContextUrl());
+
+        return subscriptionVO;
     }
 
     /**
@@ -74,7 +105,7 @@ public class EntityVOMapper extends Mapper {
     }
 
     /**
-     * Return a single, emitting the enitites associated with relationships in the given properties maps
+     * Return a single, emitting the entities associated with relationships in the given properties maps
      *
      * @param propertiesMap properties map to evaluate
      * @param targetClass   class of the target object
@@ -85,8 +116,16 @@ public class EntityVOMapper extends Mapper {
         return Optional.ofNullable(entitiesRepository.getEntities(getRelationshipObjects(propertiesMap, targetClass)))
                 .orElse(Mono.just(List.of()))
                 .switchIfEmpty(Mono.just(List.of()))
-                .map(relationshipsList -> relationshipsList.stream().map(EntityVO.class::cast).collect(Collectors.toMap(e -> e.getId().toString(), e -> e)))
+                .map(relationshipsList -> relationshipsList.stream()
+                        .map(EntityVO.class::cast)
+                        .filter(distinctByKey(e -> e.getId()))
+                        .collect(Collectors.toMap(e -> e.getId().toString(), e -> e)))
                 .defaultIfEmpty(Map.of());
+    }
+
+    private static <T> Predicate<T> distinctByKey(Function<? super T, Object> keyExtractor) {
+        Map<Object, Boolean> seen = new ConcurrentHashMap<>();
+        return t -> seen.putIfAbsent(keyExtractor.apply(t), Boolean.TRUE) == null;
     }
 
     /**
@@ -125,6 +164,11 @@ public class EntityVOMapper extends Mapper {
         }
     }
 
+
+    public NotificationVO readNotificationFromJSON(String json) throws JsonProcessingException {
+        return objectMapper.readValue(json, NotificationVO.class);
+    }
+
     /**
      * Helper method to create a propertyVO for well-known(thus flat) properties
      *
@@ -142,7 +186,7 @@ public class EntityVOMapper extends Mapper {
      *
      * @param entry                   additional properties entry
      * @param objectUnderConstruction the new object, to be filled with the values
-     * @param relationShipMap         map of preevaluated realtions
+     * @param relationShipMap         map of pre-evaluated relations
      * @param entityId                id of the entity
      * @param <T>                     class of the constructed object
      * @return single, emmiting the constructed object
@@ -164,11 +208,16 @@ public class EntityVOMapper extends Mapper {
         Class<?> parameterType = getParameterType(setterMethod.getParameterTypes());
 
         return switch (setterAnnotation.value()) {
-            case PROPERTY, GEO_PROPERTY -> handleProperty(entry.getValue(), objectUnderConstruction, optionalSetter.get(), parameterType);
-            case PROPERTY_LIST -> handlePropertyList(entry.getValue(), objectUnderConstruction, optionalSetter.get(), setterAnnotation);
-            case RELATIONSHIP -> handleRelationship(entry.getValue(), objectUnderConstruction, relationShipMap, optionalSetter.get(), setterAnnotation);
-            case RELATIONSHIP_LIST -> handleRelationshipList(entry.getValue(), objectUnderConstruction, relationShipMap, optionalSetter.get(), setterAnnotation);
-            default -> Mono.error(new MappingException(String.format("Received type %s is not supported.", setterAnnotation.value())));
+            case PROPERTY, GEO_PROPERTY ->
+                    handleProperty(entry.getValue(), objectUnderConstruction, optionalSetter.get(), parameterType);
+            case PROPERTY_LIST ->
+                    handlePropertyList(entry.getValue(), objectUnderConstruction, optionalSetter.get(), setterAnnotation);
+            case RELATIONSHIP ->
+                    handleRelationship(entry.getValue(), objectUnderConstruction, relationShipMap, optionalSetter.get(), setterAnnotation);
+            case RELATIONSHIP_LIST ->
+                    handleRelationshipList(entry.getValue(), objectUnderConstruction, relationShipMap, optionalSetter.get(), setterAnnotation);
+            default ->
+                    Mono.error(new MappingException(String.format("Received type %s is not supported.", setterAnnotation.value())));
         };
     }
 
@@ -234,20 +283,23 @@ public class EntityVOMapper extends Mapper {
     private <T> Mono<T> handleRelationshipList(AdditionalPropertyVO attributeValue, T objectUnderConstruction, Map<String, EntityVO> relationShipMap, Method setter, AttributeSetter setterAnnotation) {
         Class<?> targetClass = setterAnnotation.targetClass();
         if (setterAnnotation.fromProperties()) {
-            if (attributeValue instanceof RelationshipVO singlePropertyMap) {
-                return relationshipFromProperties(singlePropertyMap, targetClass)
+            Optional<RelationshipVO> optionalRelationshipVO = getRelationshipFromProperty(attributeValue);
+            Optional<RelationshipListVO> optionalRelationshipListVO = getRelationshipListFromProperty(attributeValue);
+            if (optionalRelationshipVO.isPresent()) {
+                return relationshipFromProperties(optionalRelationshipVO.get(), targetClass)
                         .flatMap(relationship -> {
                             // we return the constructed object, since invoke most likely returns null, which is not allowed on mapper functions
                             // a list is created, since we have a relationship-list defined by the annotation
                             return invokeWithExceptionHandling(setter, objectUnderConstruction, List.of(relationship));
                         });
-            } else if (attributeValue instanceof RelationshipListVO multiPropertyList) {
-                return Mono.zip(multiPropertyList.stream().map(relationshipVO -> relationshipFromProperties(relationshipVO, targetClass)).toList(),
+            } else if (optionalRelationshipListVO.isPresent()) {
+                return Mono.zip(optionalRelationshipListVO.get().stream().map(relationshipVO -> relationshipFromProperties(relationshipVO, targetClass)).toList(),
                         oList -> Arrays.asList(oList).stream().map(targetClass::cast).toList()).flatMap(relationshipList -> {
                     // we return the constructed object, since invoke most likely returns null, which is not allowed on mapper functions
                     return invokeWithExceptionHandling(setter, objectUnderConstruction, relationshipList);
                 });
-
+            } else if (attributeValue instanceof PropertyVO pvo && pvo.getValue() instanceof List<?> vl && vl.isEmpty()) {
+                return Mono.just(objectUnderConstruction);
             } else {
                 return Mono.error(new MappingException(String.format("Value of the relationship %s is invalid.", attributeValue)));
             }
@@ -336,11 +388,16 @@ public class EntityVOMapper extends Mapper {
                         AttributeSetter setterAnnotation = optionalAttributeSetterAnnotation.get();
 
                         Optional<AdditionalPropertyVO> optionalProperty = switch (methodEntry.getKey()) {
-                            case RelationshipVO.JSON_PROPERTY_OBSERVED_AT -> Optional.ofNullable(relationshipVO.getObservedAt()).map(this::propertyVOFromValue);
-                            case RelationshipVO.JSON_PROPERTY_CREATED_AT -> Optional.ofNullable(relationshipVO.getCreatedAt()).map(this::propertyVOFromValue);
-                            case RelationshipVO.JSON_PROPERTY_MODIFIED_AT -> Optional.ofNullable(relationshipVO.getModifiedAt()).map(this::propertyVOFromValue);
-                            case RelationshipVO.JSON_PROPERTY_DATASET_ID -> Optional.ofNullable(relationshipVO.getDatasetId()).map(this::propertyVOFromValue);
-                            case RelationshipVO.JSON_PROPERTY_INSTANCE_ID -> Optional.ofNullable(relationshipVO.getInstanceId()).map(this::propertyVOFromValue);
+                            case RelationshipVO.JSON_PROPERTY_OBSERVED_AT ->
+                                    Optional.ofNullable(relationshipVO.getObservedAt()).map(this::propertyVOFromValue);
+                            case RelationshipVO.JSON_PROPERTY_CREATED_AT ->
+                                    Optional.ofNullable(relationshipVO.getCreatedAt()).map(this::propertyVOFromValue);
+                            case RelationshipVO.JSON_PROPERTY_MODIFIED_AT ->
+                                    Optional.ofNullable(relationshipVO.getModifiedAt()).map(this::propertyVOFromValue);
+                            case RelationshipVO.JSON_PROPERTY_DATASET_ID ->
+                                    Optional.ofNullable(relationshipVO.getDatasetId()).map(this::propertyVOFromValue);
+                            case RelationshipVO.JSON_PROPERTY_INSTANCE_ID ->
+                                    Optional.ofNullable(relationshipVO.getInstanceId()).map(this::propertyVOFromValue);
                             default -> Optional.empty();
                         };
 
@@ -351,13 +408,19 @@ public class EntityVOMapper extends Mapper {
 
                         return optionalProperty.map(attributeValue -> {
                             return switch (setterAnnotation.value()) {
-                                case PROPERTY, GEO_PROPERTY -> handleProperty(attributeValue, constructedObject, setterMethod, setterAnnotation.targetClass());
-                                case RELATIONSHIP -> getRelationshipMap(relationshipVO.getAdditionalProperties(), targetClass)
-                                        .map(rm -> handleRelationship(attributeValue, constructedObject, rm, setterMethod, setterAnnotation)); //resolve objects;
-                                case RELATIONSHIP_LIST -> getRelationshipMap(relationshipVO.getAdditionalProperties(), targetClass)
-                                        .map(rm -> handleRelationshipList(attributeValue, constructedObject, rm, setterMethod, setterAnnotation));
-                                case PROPERTY_LIST -> handlePropertyList(attributeValue, constructedObject, setterMethod, setterAnnotation);
-                                default -> Mono.error(new MappingException(String.format("Received type %s is not supported.", setterAnnotation.value())));
+                                case PROPERTY, GEO_PROPERTY ->
+                                        handleProperty(attributeValue, constructedObject, setterMethod, setterAnnotation.targetClass());
+                                case RELATIONSHIP ->
+                                        getRelationshipMap(relationshipVO.getAdditionalProperties(), targetClass)
+                                                .map(rm -> handleRelationship(attributeValue, constructedObject, rm, setterMethod, setterAnnotation));
+                                //resolve objects;
+                                case RELATIONSHIP_LIST ->
+                                        getRelationshipMap(relationshipVO.getAdditionalProperties(), targetClass)
+                                                .map(rm -> handleRelationshipList(attributeValue, constructedObject, rm, setterMethod, setterAnnotation));
+                                case PROPERTY_LIST ->
+                                        handlePropertyList(attributeValue, constructedObject, setterMethod, setterAnnotation);
+                                default ->
+                                        Mono.error(new MappingException(String.format("Received type %s is not supported.", setterAnnotation.value())));
                             };
                         }).orElse(Mono.just(constructedObject));
 
@@ -411,13 +474,17 @@ public class EntityVOMapper extends Mapper {
      * @return a list of all referenced ids
      */
     private List<URI> getURIsFromRelationshipObject(AdditionalPropertyVO additionalPropertyVO) {
-        if (additionalPropertyVO instanceof RelationshipVO relationshipVO) {
+        Optional<RelationshipVO> optionalRelationshipVO = getRelationshipFromProperty(additionalPropertyVO);
+        if (optionalRelationshipVO.isPresent()) {
             // List.of() cannot be used, since we need a mutable list
             List<URI> uriList = new ArrayList<>();
-            uriList.add(relationshipVO.getObject());
+            uriList.add(optionalRelationshipVO.get().getObject());
             return uriList;
-        } else if (additionalPropertyVO instanceof RelationshipListVO relationshipList) {
-            return relationshipList.stream().flatMap(listEntry -> getURIsFromRelationshipObject(listEntry).stream()).toList();
+        }
+
+        Optional<RelationshipListVO> optionalRelationshipListVO = getRelationshipListFromProperty(additionalPropertyVO);
+        if (optionalRelationshipListVO.isPresent()) {
+            return optionalRelationshipListVO.get().stream().flatMap(listEntry -> getURIsFromRelationshipObject(listEntry).stream()).toList();
         }
         return List.of();
     }
@@ -431,13 +498,44 @@ public class EntityVOMapper extends Mapper {
      * @return a list of objects, mapping the relationship
      */
     private <T> Mono<List<T>> relationshipListToTargetClass(AdditionalPropertyVO entry, Class<T> targetClass, Map<String, EntityVO> relationShipEntitiesMap) {
-        if (entry instanceof RelationshipVO relationshipVO) {
-            return getObjectFromRelationship(relationshipVO, targetClass, relationShipEntitiesMap, relationshipVO.getAdditionalProperties()).map(List::of);
-        } else if (entry instanceof RelationshipListVO relationshipMap) {
-            return zipToList(relationshipMap.stream(), targetClass, relationShipEntitiesMap);
 
+        Optional<RelationshipVO> optionalRelationshipVO = getRelationshipFromProperty(entry);
+        if (optionalRelationshipVO.isPresent()) {
+            return getObjectFromRelationship(optionalRelationshipVO.get(), targetClass, relationShipEntitiesMap, optionalRelationshipVO.get().getAdditionalProperties())
+                    .map(List::of);
         }
-        return Mono.error(new MappingException(String.format("Did not receive a valid entry: %s", entry)));
+
+        Optional<RelationshipListVO> optionalRelationshipListVO = getRelationshipListFromProperty(entry);
+        if (optionalRelationshipListVO.isPresent()) {
+            return zipToList(optionalRelationshipListVO.get().stream(), targetClass, relationShipEntitiesMap);
+        }
+        return Mono.just(List.of());
+    }
+
+    private Optional<RelationshipListVO> getRelationshipListFromProperty(AdditionalPropertyVO additionalPropertyVO) {
+        if (additionalPropertyVO instanceof RelationshipListVO rsl) {
+            return Optional.of(rsl);
+        } else if (additionalPropertyVO instanceof PropertyListVO propertyListVO && !propertyListVO.isEmpty() && isRelationship(propertyListVO.get(0))) {
+            RelationshipListVO relationshipListVO = new RelationshipListVO();
+            propertyListVO.stream()
+                    .map(propertyVO -> objectMapper.convertValue(propertyVO.getValue(), RelationshipVO.class))
+                    .forEach(relationshipListVO::add);
+            return Optional.of(relationshipListVO);
+        }
+        return Optional.empty();
+    }
+
+    private Optional<RelationshipVO> getRelationshipFromProperty(AdditionalPropertyVO additionalPropertyVO) {
+        if (additionalPropertyVO instanceof RelationshipVO relationshipVO) {
+            return Optional.of(relationshipVO);
+        } else if (additionalPropertyVO instanceof PropertyVO propertyVO && isRelationship(propertyVO)) {
+            return Optional.of(objectMapper.convertValue(propertyVO.getValue(), RelationshipVO.class));
+        }
+        return Optional.empty();
+    }
+
+    private boolean isRelationship(PropertyVO testProperty) {
+        return testProperty.getValue() instanceof Map<?, ?> valuesMap && valuesMap.get("type").equals(PropertyTypeVO.RELATIONSHIP.getValue());
     }
 
     /**
@@ -482,13 +580,27 @@ public class EntityVOMapper extends Mapper {
      * @return the actual object
      */
     private <T> Mono<T> getObjectFromRelationship(RelationshipVO relationshipVO, Class<T> targetClass, Map<String, EntityVO> relationShipEntitiesMap, Map<String, AdditionalPropertyVO> additionalPropertyVOMap) {
-        EntityVO entityVO = relationShipEntitiesMap.get(relationshipVO.getObject().toString());
+        Optional<EntityVO> optionalEntityVO = Optional.ofNullable(relationShipEntitiesMap.get(relationshipVO.getObject().toString()));
+        if (optionalEntityVO.isEmpty() && !mappingProperties.isStrictRelationships()) {
+            try {
+                Constructor<T> objectConstructor = targetClass.getDeclaredConstructor(String.class);
+                T theObject = objectConstructor.newInstance(relationshipVO.getObject().toString());
+                // return the empty object
+                return Mono.just(theObject);
+            } catch (InvocationTargetException | InstantiationException | IllegalAccessException |
+                     NoSuchMethodException e) {
+                return Mono.error(new MappingException(String.format("Was not able to instantiate %s with a string parameter.", targetClass), e));
+            }
+        } else if (optionalEntityVO.isEmpty()) {
+            return Mono.error(new MappingException(String.format("Was not able to resolve the relationship %s", relationshipVO.getObject())));
+        }
+
+        var entityVO = optionalEntityVO.get();
         //merge with override properties
         if (additionalPropertyVOMap != null) {
             entityVO.getAdditionalProperties().putAll(additionalPropertyVOMap);
         }
         return fromEntityVO(entityVO, targetClass);
-
     }
 
     /**
