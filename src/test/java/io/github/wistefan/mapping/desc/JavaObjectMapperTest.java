@@ -333,6 +333,8 @@ class JavaObjectMapperTest {
 		return Stream.of(
 				Arguments.of(MyPojo.class, List.of("myName"),
 						new NgsiLdAttribute(List.of("name"), QueryAttributeType.STRING)),
+				Arguments.of(MyPojo.class, List.of("id"),
+						new NgsiLdAttribute(List.of("id"), QueryAttributeType.STRING)),
 				Arguments.of(MyPojo.class, List.of("numbers"),
 						new NgsiLdAttribute(List.of("numbers"), QueryAttributeType.STRING)),
 				Arguments.of(MyPojoWithSubProperty.class, List.of("mySubProperty", "propertyName"),

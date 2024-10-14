@@ -22,6 +22,8 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class JavaObjectMapper extends Mapper {
 
+    // name of the property containing the ID
+    private static final String ID_PROPERTY = "id";
     private final MappingProperties mappingProperties;
 
     public static final String NO_MAPPING_DEFINED_FOR_METHOD_TEMPLATE = "No mapping defined for method %s";
@@ -39,6 +41,10 @@ public class JavaObjectMapper extends Mapper {
         List<String> ngsiAttributePath = new ArrayList<>();
         QueryAttributeType type = QueryAttributeType.STRING;
         String currentAttribute = attributePath.get(0);
+        if(currentAttribute.equals(ID_PROPERTY)) {
+            ngsiAttributePath.add(ID_PROPERTY);
+            return new NgsiLdAttribute(ngsiAttributePath, QueryAttributeType.STRING);
+        }
         if (isMappingEnabled(tClass).isPresent()) {
             // for mapped properties, we have to climb down the property names
             // we need the setter in case of type-erasure and the getter in all other cases
