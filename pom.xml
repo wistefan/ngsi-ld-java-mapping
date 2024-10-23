@@ -89,7 +89,7 @@
 
         <!-- rx -->
         <version.io.reactivex.rxjava2.rxjava>2.2.21</version.io.reactivex.rxjava2.rxjava>
-        <version.io.projectreactor.reactor-core>3.5.5</version.io.projectreactor.reactor-core>
+        <version.io.projectreactor.reactor-core>3.6.10</version.io.projectreactor.reactor-core>
         <version.javax.inject>1</version.javax.inject>
 
         <!-- logging -->
