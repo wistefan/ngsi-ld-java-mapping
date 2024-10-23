@@ -68,7 +68,7 @@
         <gpg.passphrase>pass</gpg.passphrase>
 
         <!-- lazy dev -->
-        <version.org.mapstruct>1.4.2.Final</version.org.mapstruct>
+        <version.org.mapstruct>1.6.2</version.org.mapstruct>
         <version.org.projectlombok>1.18.30</version.org.projectlombok>
 
         <!-- code gen -->
