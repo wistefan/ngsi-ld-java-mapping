@@ -9,13 +9,7 @@ import com.fasterxml.jackson.databind.jsontype.TypeIdResolver;
 import com.fasterxml.jackson.databind.jsontype.impl.AsArrayTypeDeserializer;
 import com.fasterxml.jackson.databind.jsontype.impl.AsPropertyTypeDeserializer;
 import com.fasterxml.jackson.databind.type.TypeFactory;
-import org.fiware.ngsi.model.AdditionalPropertyObjectVO;
-import org.fiware.ngsi.model.GeoPropertyListVO;
-import org.fiware.ngsi.model.GeoPropertyVO;
-import org.fiware.ngsi.model.PropertyListVO;
-import org.fiware.ngsi.model.PropertyVO;
-import org.fiware.ngsi.model.RelationshipListVO;
-import org.fiware.ngsi.model.RelationshipVO;
+import org.fiware.ngsi.model.*;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -66,8 +60,11 @@ public class AdditionalPropertyDeserializer extends AsArrayTypeDeserializer {
 		// one object to be deserialized. The parser is handed over to the specialized method.
 		if (t == JsonToken.START_OBJECT) {
 			return deserializeArray(p, ctxt);
-
+		} else if (t == JsonToken.END_ARRAY) {
+			// we received an empty list
+			return new PropertyListVO();
 		}
+
 		return super._deserialize(p, ctxt);
 	}
 
