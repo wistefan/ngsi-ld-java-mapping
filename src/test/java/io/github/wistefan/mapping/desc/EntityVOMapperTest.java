@@ -394,6 +394,21 @@ class EntityVOMapperTest {
         assertEquals(expectedPojo, myPojoWithSubEntity, "The full pojo should be retrieved.");
     }
 
+    @DisplayName("*****Test mapping geo entities*****")
+    @Test
+    void testMappingGeoEntities() throws JsonProcessingException {
+        MyPojoWithLocation expectedPojoWithLocation = new MyPojoWithLocation("urn:ngsi-ld:complex-pojo:the-test-pojo");
+        MyLocation location = new MyLocation();
+        double[] coordinates =  new double[]{0.0, 0.0};
+        location.setCoordinates(coordinates);
+        expectedPojoWithLocation.setMyLocation(location);
+        String entityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"location-pojo\",\"myLocation\": { \"type\": \"GeoProperty\",    \"value\": {      \"type\": \"Point\",      \"coordinates\": [0,0]    }  }}";
+        EntityVO parsedEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+        //GeoPropertyVO
+        MyPojoWithLocation myPojoWithLocation = entityVOMapper.fromEntityVO(parsedEntity, MyPojoWithLocation.class).block();
+        assertEquals(expectedPojoWithLocation.getId(), myPojoWithLocation.getId(), "GeoEntities can be mapped to their Java Objects");
+    }
+
     private MySubscriptionPojo createSubscription() {
         MySubscriptionPojo myPojo = new MySubscriptionPojo("urn:ngsi-ld:my-pojo:the-test-pojo");
         myPojo.setQ("eventType=custom");
