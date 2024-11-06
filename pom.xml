@@ -84,8 +84,7 @@
         <!-- json -->
         <version.com.fasterxml.jackson.core.jackson-databind>2.15.0
         </version.com.fasterxml.jackson.core.jackson-databind>
-        <version.com.fasterxml.jackson.datatype.jackson-datatype-jsr310>2.15.0
-        </version.com.fasterxml.jackson.datatype.jackson-datatype-jsr310>
+        <version.com.fasterxml.jackson.datatype.jackson-datatype-jsr310>2.18.0</version.com.fasterxml.jackson.datatype.jackson-datatype-jsr310>
 
         <!-- rx -->
         <version.io.reactivex.rxjava2.rxjava>2.2.21</version.io.reactivex.rxjava2.rxjava>
