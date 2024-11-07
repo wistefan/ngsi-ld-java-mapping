@@ -82,8 +82,7 @@
         <version.io.micronaut.micronaut-http-client>3.10.4</version.io.micronaut.micronaut-http-client>
 
         <!-- json -->
-        <version.com.fasterxml.jackson.core.jackson-databind>2.15.0
-        </version.com.fasterxml.jackson.core.jackson-databind>
+        <version.com.fasterxml.jackson.core.jackson-databind>2.18.0</version.com.fasterxml.jackson.core.jackson-databind>
         <version.com.fasterxml.jackson.datatype.jackson-datatype-jsr310>2.15.0
         </version.com.fasterxml.jackson.datatype.jackson-datatype-jsr310>
 
