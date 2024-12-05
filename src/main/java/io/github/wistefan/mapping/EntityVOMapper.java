@@ -1,46 +1,27 @@
 package io.github.wistefan.mapping;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import io.github.wistefan.mapping.annotations.AttributeSetter;
+import io.github.wistefan.mapping.annotations.AttributeType;
+import io.github.wistefan.mapping.annotations.MappingEnabled;
+import lombok.extern.slf4j.Slf4j;
+import org.fiware.ngsi.model.*;
+import reactor.core.publisher.Mono;
+
+import javax.inject.Singleton;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import javax.inject.Singleton;
-
-import org.fiware.ngsi.model.AdditionalPropertyVO;
-import org.fiware.ngsi.model.EntityVO;
-import org.fiware.ngsi.model.GeoPropertyVO;
-import org.fiware.ngsi.model.GeoQueryVO;
-import org.fiware.ngsi.model.NotificationVO;
-import org.fiware.ngsi.model.PropertyListVO;
-import org.fiware.ngsi.model.PropertyTypeVO;
-import org.fiware.ngsi.model.PropertyVO;
-import org.fiware.ngsi.model.RelationshipListVO;
-import org.fiware.ngsi.model.RelationshipVO;
-import org.fiware.ngsi.model.SubscriptionVO;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-
-import io.github.wistefan.mapping.annotations.AttributeSetter;
-import io.github.wistefan.mapping.annotations.AttributeType;
-import io.github.wistefan.mapping.annotations.MappingEnabled;
-import lombok.extern.slf4j.Slf4j;
-import reactor.core.publisher.Mono;
 
 /**
  * Mapper to handle translation from NGSI-LD entities to Java-Objects, based on annotations added to the target class
@@ -251,11 +232,9 @@ public class EntityVOMapper extends Mapper {
      * @return the single, emitting the objectUnderConstruction
      */
     private <T> Mono<T> handleProperty(AdditionalPropertyVO propertyValue, T objectUnderConstruction, Method setter, Class<?> parameterType) {
-        if (propertyValue instanceof PropertyVO propertyVO) {
+        if (propertyValue instanceof PropertyVO propertyVO)
             return invokeWithExceptionHandling(setter, objectUnderConstruction, objectMapper.convertValue(propertyVO.getValue(), parameterType));
-        } else if (propertyValue instanceof GeoPropertyVO geoPropertyVO) {
-            return invokeWithExceptionHandling(setter, objectUnderConstruction, objectMapper.convertValue(geoPropertyVO.getValue(), parameterType));
-        } else {
+        else {
             log.error("Mapping exception");
             return Mono.error(new MappingException(String.format("The attribute is not a valid property: %s ", propertyValue)));
         }
@@ -536,6 +515,13 @@ public class EntityVOMapper extends Mapper {
     private Optional<RelationshipListVO> getRelationshipListFromProperty(AdditionalPropertyVO additionalPropertyVO) {
         if (additionalPropertyVO instanceof RelationshipListVO rsl) {
             return Optional.of(rsl);
+        } else if ((additionalPropertyVO instanceof PropertyVO propertyVO && ((PropertyVO) additionalPropertyVO).getValue() instanceof List<?> propertyListVO && isRelationshipList(propertyVO))) {
+            RelationshipListVO relationshipListVO = new RelationshipListVO();
+            propertyListVO.stream()
+                    .map(value -> objectMapper.convertValue(value, RelationshipVO.class))
+                    .forEach(relationshipListVO::add);
+            return Optional.of(relationshipListVO);
+
         } else if (additionalPropertyVO instanceof PropertyListVO propertyListVO && !propertyListVO.isEmpty() && isRelationship(propertyListVO.get(0))) {
             RelationshipListVO relationshipListVO = new RelationshipListVO();
             propertyListVO.stream()
@@ -557,6 +543,10 @@ public class EntityVOMapper extends Mapper {
 
     private boolean isRelationship(PropertyVO testProperty) {
         return testProperty.getValue() instanceof Map<?, ?> valuesMap && valuesMap.get("type").equals(PropertyTypeVO.RELATIONSHIP.getValue());
+    }
+
+    private boolean isRelationshipList(PropertyVO testProperty) {
+        return testProperty.getValue() instanceof List<?> valuesList && valuesList.stream().map(v -> (PropertyVO) v).allMatch(this::isRelationship);
     }
 
     /**
