@@ -567,7 +567,14 @@ public class EntityVOMapper extends Mapper {
 	}
 
 	private boolean isRelationshipList(PropertyVO testProperty) {
-		return testProperty.getValue() instanceof List<?> valuesList && valuesList.stream().map(v -> (PropertyVO) v).allMatch(this::isRelationship);
+		return testProperty.getValue() instanceof List<?> valuesList &&
+				valuesList.stream()
+						.allMatch(v -> {
+							if (v instanceof Map<?, ?> valueAsMap) {
+								return valueAsMap.get("type").equals(PropertyTypeVO.RELATIONSHIP.getValue());
+							}
+							return false;
+						});
 	}
 
 	/**
