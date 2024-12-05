@@ -536,7 +536,7 @@ public class EntityVOMapper extends Mapper {
 	private Optional<RelationshipListVO> getRelationshipListFromProperty(AdditionalPropertyVO additionalPropertyVO) {
 		if (additionalPropertyVO instanceof RelationshipListVO rsl) {
 			return Optional.of(rsl);
-		} else if ((additionalPropertyVO instanceof PropertyVO propertyVO && ((PropertyVO) additionalPropertyVO).getValue() instanceof List<?> propertyListVO && isRelationshipList(propertyVO))) {
+		} else if ((additionalPropertyVO instanceof PropertyVO propertyVO && ((PropertyVO) additionalPropertyVO).getValue() instanceof List<?> propertyListVO && !propertyListVO.isEmpty() && isRelationshipList(propertyVO))) {
 			RelationshipListVO relationshipListVO = new RelationshipListVO();
 			propertyListVO.stream()
 					.map(value -> objectMapper.convertValue(value, RelationshipVO.class))
