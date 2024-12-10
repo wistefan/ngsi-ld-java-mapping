@@ -592,6 +592,7 @@ public class EntityVOMapper extends Mapper {
 						.filter(Objects::nonNull)
 						.map(URI::toString)
 						.map(relationShipEntitiesMap::get)
+						.filter(Objects::nonNull)
 						.map(entity -> fromEntityVO(entity, targetClass))
 						.toList(),
 				oList -> Arrays.stream(oList).map(targetClass::cast).toList()
