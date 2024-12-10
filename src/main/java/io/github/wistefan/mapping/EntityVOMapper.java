@@ -326,6 +326,7 @@ public class EntityVOMapper extends Mapper {
 			}
 		} else {
 			return relationshipListToTargetClass(attributeValue, targetClass, relationShipMap)
+					.defaultIfEmpty(List.of())
 					.flatMap(relatedEntities -> {
 						// we return the constructed object, since invoke most likely returns null, which is not allowed on mapper functions
 						return invokeWithExceptionHandling(setter, objectUnderConstruction, relatedEntities);
