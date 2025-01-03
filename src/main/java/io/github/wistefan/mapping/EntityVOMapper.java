@@ -213,13 +213,13 @@ public class EntityVOMapper extends Mapper {
 	private <T> Mono<T> getObjectInvocation(Map.Entry<String, AdditionalPropertyVO> entry, T objectUnderConstruction, Map<String, EntityVO> relationShipMap, String entityId) {
 		Optional<Method> optionalSetter = getCorrespondingSetterMethod(objectUnderConstruction, entry.getKey());
 		if (optionalSetter.isEmpty()) {
-			log.warn("Ignoring property {} for entity {} since there is no mapping configured.", entry.getKey(), entityId);
+			log.debug("Ignoring property {} for entity {} since there is no mapping configured.", entry.getKey(), entityId);
 			return Mono.just(objectUnderConstruction);
 		}
 		Method setterMethod = optionalSetter.get();
 		Optional<AttributeSetter> optionalAttributeSetter = getAttributeSetterAnnotation(setterMethod);
 		if (optionalAttributeSetter.isEmpty()) {
-			log.warn("Ignoring property {} for entity {} since there is no attribute setter configured.", entry.getKey(), entityId);
+			log.debug("Ignoring property {} for entity {} since there is no attribute setter configured.", entry.getKey(), entityId);
 			return Mono.just(objectUnderConstruction);
 		}
 		AttributeSetter setterAnnotation = optionalAttributeSetter.get();
