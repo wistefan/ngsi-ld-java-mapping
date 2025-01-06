@@ -44,6 +44,44 @@ class EntityVOMapperTest {
                 .addMixIn(AdditionalPropertyVO.class, AdditionalPropertyMixin.class);
     }
 
+
+    @DisplayName("Map entity containing a compacted Array.")
+    @Test
+    void testCompactedEntityMapping() throws JsonProcessingException {
+
+
+        String parentEntityString = "{\n" +
+                "\t\"@context\": \"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\n" +
+                "  \"id\": \"urn:ngsi-ld:product-specification:50c99d0a-a477-4596-ad9c-879570a8b26e\",\n" +
+                "  \"type\": \"product-specification\",\n" +
+                "  \"productSpecCharacteristic\": {\n" +
+                "    \"type\": \"Property\",\n" +
+                "    \"value\": {\n" +
+                "      \"name\": \"Service Endpoint\",\n" +
+                "      \"valueType\": \"string\"\n" +
+                "    }\n" +
+                "  },\n" +
+                "  \"lastUpdate\": {\n" +
+                "    \"type\": \"Property\",\n" +
+                "    \"value\": \"2023-09-27T09:06:56.315945945Z\"\n" +
+                "  },\n" +
+                "  \"name\": {\n" +
+                "    \"type\": \"Property\",\n" +
+                "    \"value\": \"Packet Delivery Premium Service Spec\"\n" +
+                "  },\n" +
+                "  \"href\": {\n" +
+                "    \"type\": \"Property\",\n" +
+                "    \"value\": \"urn:ngsi-ld:product-specification:50c99d0a-a477-4596-ad9c-879570a8b26e\"\n" +
+                "  }\n" +
+                "}";
+        EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
+
+        ProductSpecification mappedPojo = entityVOMapper.fromEntityVO(parentEntity, ProductSpecification.class).block();
+        assertNotNull(mappedPojo);
+        assertNotNull(mappedPojo.getProductSpecCharacteristic());
+        assertEquals(1,mappedPojo.getProductSpecCharacteristic().size());
+    }
+
     @DisplayName("Map entity containing a relationship.")
     @Test
     void testSubEntityMapping() throws JsonProcessingException {
