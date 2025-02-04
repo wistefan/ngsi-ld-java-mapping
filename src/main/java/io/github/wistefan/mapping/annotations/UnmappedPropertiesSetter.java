@@ -6,10 +6,10 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Indicates that method provides access to unmapped properties
+ * Indicates that method provides write access to unmapped properties
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
-public @interface UnmappedProperties {
+public @interface UnmappedPropertiesSetter {
 
 }

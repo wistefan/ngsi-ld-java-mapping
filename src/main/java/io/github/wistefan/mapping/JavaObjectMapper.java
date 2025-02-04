@@ -178,7 +178,7 @@ public class JavaObjectMapper extends Mapper {
 				entityIdMethod.add(method);
 			} else if (isEntityTypeMethod(method)) {
 				entityTypeMethod.add(method);
-			} else if (isUnmappedProperties(method) && isGetterAnnotation(method)) {
+			} else if (isUnmappedPropertiesGetter(method)) {
 				unmappedPropertiesGetterMethods.add(method);
 			} else {
 				getAttributeGetter(method.getAnnotations()).ifPresent(annotation -> {
@@ -298,15 +298,8 @@ public class JavaObjectMapper extends Mapper {
 	/**
 	 * Check if the given method handles access to the unmapped properties
 	 */
-	private boolean isUnmappedProperties(Method method) {
-		return Arrays.stream(method.getAnnotations()).anyMatch(UnmappedProperties.class::isInstance);
-	}
-
-	/**
-	 * Check if the given method is an AttributeGetter
-	 */
-	private boolean isGetterAnnotation(Method method) {
-		return Arrays.stream(method.getAnnotations()).anyMatch(AttributeGetter.class::isInstance);
+	private boolean isUnmappedPropertiesGetter(Method method) {
+		return Arrays.stream(method.getAnnotations()).anyMatch(UnmappedPropertiesGetter.class::isInstance);
 	}
 
 	/**
@@ -369,10 +362,10 @@ public class JavaObjectMapper extends Mapper {
 	private <T> Map<String, AdditionalPropertyVO> buildUnmappedProperties(T entity, Method method) {
 		try {
 			Object unmappedProperties = method.invoke(entity);
-			if (unmappedProperties instanceof List unmappedPropertiesList) {
+			if (unmappedProperties instanceof List<?> unmappedPropertiesList) {
 				List<UnmappedProperty> theList = unmappedPropertiesList
 						.stream()
-						.filter(ump -> ump instanceof UnmappedProperty)
+						.filter(UnmappedProperty.class::isInstance)
 						.map(UnmappedProperty.class::cast)
 						.toList();
 				return theList.stream()

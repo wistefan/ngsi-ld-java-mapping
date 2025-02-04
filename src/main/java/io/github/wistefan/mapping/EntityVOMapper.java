@@ -1,47 +1,28 @@
 package io.github.wistefan.mapping;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import io.github.wistefan.mapping.annotations.AttributeSetter;
+import io.github.wistefan.mapping.annotations.AttributeType;
+import io.github.wistefan.mapping.annotations.MappingEnabled;
+import io.github.wistefan.mapping.annotations.UnmappedPropertiesSetter;
+import lombok.extern.slf4j.Slf4j;
+import org.fiware.ngsi.model.*;
+import reactor.core.publisher.Mono;
+
+import javax.inject.Singleton;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import javax.inject.Singleton;
-
-import io.github.wistefan.mapping.annotations.UnmappedProperties;
-import org.fiware.ngsi.model.AdditionalPropertyVO;
-import org.fiware.ngsi.model.EntityVO;
-import org.fiware.ngsi.model.GeoPropertyVO;
-import org.fiware.ngsi.model.GeoQueryVO;
-import org.fiware.ngsi.model.NotificationVO;
-import org.fiware.ngsi.model.PropertyListVO;
-import org.fiware.ngsi.model.PropertyTypeVO;
-import org.fiware.ngsi.model.PropertyVO;
-import org.fiware.ngsi.model.RelationshipListVO;
-import org.fiware.ngsi.model.RelationshipVO;
-import org.fiware.ngsi.model.SubscriptionVO;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-
-import io.github.wistefan.mapping.annotations.AttributeSetter;
-import io.github.wistefan.mapping.annotations.AttributeType;
-import io.github.wistefan.mapping.annotations.MappingEnabled;
-import lombok.extern.slf4j.Slf4j;
-import reactor.core.publisher.Mono;
 
 /**
  * Mapper to handle translation from NGSI-LD entities to Java-Objects, based on annotations added to the target class
@@ -49,6 +30,8 @@ import reactor.core.publisher.Mono;
 @Slf4j
 @Singleton
 public class EntityVOMapper extends Mapper {
+
+	private static final List<String> WELL_KNOWN_PROPERTIES = List.of(EntityVO.JSON_PROPERTY_MODIFIED_AT, EntityVO.JSON_PROPERTY_CREATED_AT, EntityVO.JSON_PROPERTY_LOCATION, EntityVO.JSON_PROPERTY_OBSERVATION_SPACE, EntityVO.JSON_PROPERTY_OPERATION_SPACE, EntityVO.JSON_PROPERTY_DELETED_AT);
 
 	private final MappingProperties mappingProperties;
 	private final ObjectMapper objectMapper;
@@ -176,11 +159,12 @@ public class EntityVOMapper extends Mapper {
 					.map(entry -> getObjectInvocation(entry, constructedObject, relationShipMap, entityVO.getId().toString()))
 					.toList();
 
-			Optional<Method> unmappedPropertiesSetter = getUnmappedPropertiesSetter(entityVO);
+			Optional<Method> unmappedPropertiesSetter = getUnmappedPropertiesSetter(constructedObject);
 			if (unmappedPropertiesSetter.isPresent()) {
 				List<Map.Entry<String, AdditionalPropertyVO>> unmappedProperties = propertiesMap.entrySet()
 						.stream()
-						.filter(entry -> getCorrespondingSetterMethod(entityVO, entry.getKey()).isEmpty())
+						.filter(entry -> getCorrespondingSetterMethod(constructedObject, entry.getKey()).isEmpty())
+						.filter(entry -> !isWellKnownProperty(entry.getKey()))
 						.toList();
 				singleInvocations = new ArrayList<>(singleInvocations);
 				singleInvocations.add(
@@ -196,6 +180,9 @@ public class EntityVOMapper extends Mapper {
 		}
 	}
 
+	private boolean isWellKnownProperty(String propertyName) {
+		return WELL_KNOWN_PROPERTIES.contains(propertyName);
+	}
 
 	public NotificationVO readNotificationFromJSON(String json) throws JsonProcessingException {
 		return objectMapper.readValue(json, NotificationVO.class);
@@ -594,8 +581,8 @@ public class EntityVOMapper extends Mapper {
 	/**
 	 * Check if the given method handles access to the unmapped properties
 	 */
-	private boolean isUnmappedProperties(Method method) {
-		return Arrays.stream(method.getAnnotations()).anyMatch(UnmappedProperties.class::isInstance);
+	private boolean isUnmappedPropertiesSetter(Method method) {
+		return Arrays.stream(method.getAnnotations()).anyMatch(UnmappedPropertiesSetter.class::isInstance);
 	}
 
 	private boolean isRelationshipList(PropertyVO testProperty) {
@@ -704,8 +691,7 @@ public class EntityVOMapper extends Mapper {
 
 	private <T> Optional<Method> getUnmappedPropertiesSetter(T entity) {
 		return Arrays.stream(entity.getClass().getMethods())
-				.filter(this::isUnmappedProperties)
-				.filter(m -> getAttributeSetterAnnotation(m).isPresent()).findAny();
+				.filter(this::isUnmappedPropertiesSetter).findAny();
 	}
 
 	private <T> Map<String, Method> getAttributeSetterMethodMap(T entity) {
