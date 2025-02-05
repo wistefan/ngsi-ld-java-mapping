@@ -117,6 +117,23 @@ class EntityVOMapperTest {
 		assertEquals(OBJECT_MAPPER.writeValueAsString(expectedPojo), OBJECT_MAPPER.writeValueAsString(myPojoWithUnmappedProperties), "The full pojo should be returned.");
 	}
 
+	@DisplayName("Map entity with an unmapped property, containing a relationship.")
+	@Test
+	void testWithUnmappedRelationship() throws Exception {
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty("test", "test"));
+		unmappedProperties.add(new UnmappedProperty("complex", Map.of("something", "other", "id", "urn:ngsi-ld:entity:id")));
+
+		MyPojoWithUnmappedProperties expectedPojo = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		expectedPojo.setMyName("my-name");
+		expectedPojo.setUnmappedProperties(unmappedProperties);
+
+		String entityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"test\":{\"value\":\"test\",\"type\":\"Property\"},\"complex\":{\"object\":\"urn:ngsi-ld:entity:id\",\"type\":\"Relationship\",\"something\":{\"value\":\"other\",\"type\":\"Property\"}},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = entityVOMapper.fromEntityVO(theEntity, MyPojoWithUnmappedProperties.class).block();
+		assertEquals(expectedPojo, myPojoWithUnmappedProperties, "The full pojo should be returned.");
+	}
 
 	@DisplayName("Map entity with a complex unmapped property.")
 	@Test
@@ -129,7 +146,7 @@ class EntityVOMapperTest {
 		expectedPojo.setMyName("my-name");
 		expectedPojo.setUnmappedProperties(unmappedProperties);
 
-		String entityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"test\":{\"value\":\"test\",\"type\":\"Property\"},\"complex\":{\"value\":{\"number\":{\"value\":1,\"type\":\"Property\"},\"something\":{\"value\":\"something\",\"type\":\"Property\"}},\"type\":\"Property\"},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
+		String entityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"test\":{\"value\":\"test\",\"type\":\"Property\"},\"complex\":{\"value\":{\"number\":{\"value\":1,\"type\":\"Property\"},\"something\":{\"value\":\"something\",\"type\":\"Property\"}},\"type\":\"Property\",\"number\":{\"value\":1,\"type\":\"Property\"},\"something\":{\"value\":\"something\",\"type\":\"Property\"}},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
 		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
 
 		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = entityVOMapper.fromEntityVO(theEntity, MyPojoWithUnmappedProperties.class).block();
@@ -147,7 +164,7 @@ class EntityVOMapperTest {
 		expectedPojo.setMyName("my-name");
 		expectedPojo.setUnmappedProperties(unmappedProperties);
 
-		String entityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"test\":{\"value\":\"test\",\"type\":\"Property\"},\"complex\":{\"value\":{\"number\":{\"value\":1,\"type\":\"Property\"},\"deep\":{\"value\":{\"something\":{\"value\":\"deep\",\"type\":\"Property\"}},\"type\":\"Property\"}},\"type\":\"Property\"},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
+		String entityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"test\":{\"value\":\"test\",\"type\":\"Property\"},\"complex\":{\"value\":{\"number\":{\"value\":1,\"type\":\"Property\"},\"deep\":{\"value\":{\"something\":{\"value\":\"deep\",\"type\":\"Property\"}},\"type\":\"Property\",\"something\":{\"value\":\"deep\",\"type\":\"Property\"}}},\"type\":\"Property\",\"number\":{\"value\":1,\"type\":\"Property\"},\"deep\":{\"value\":{\"something\":{\"value\":\"deep\",\"type\":\"Property\"}},\"type\":\"Property\",\"something\":{\"value\":\"deep\",\"type\":\"Property\"}}},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
 		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
 
 		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = entityVOMapper.fromEntityVO(theEntity, MyPojoWithUnmappedProperties.class).block();

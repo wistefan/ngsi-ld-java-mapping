@@ -259,36 +259,57 @@ public class EntityVOMapper extends Mapper {
 							.map(pvo -> fromProperty(unmappedAdditionalProperty.getKey(), pvo))
 							.map(Map.Entry::getValue)
 							.toList());
+		} else if (unmappedAdditionalProperty.getValue() instanceof RelationshipListVO relationshipListVO) {
+			unmappedProperty.setValue(
+					relationshipListVO.stream()
+							.map(rvo -> fromRelationship(unmappedAdditionalProperty.getKey(), rvo))
+							.map(Map.Entry::getValue)
+							.toList());
 		} else if (unmappedAdditionalProperty.getValue() instanceof PropertyVO propertyVO) {
 			unmappedProperty.setValue(fromProperty(unmappedAdditionalProperty.getKey(), propertyVO).getValue());
+		} else if (unmappedAdditionalProperty.getValue() instanceof RelationshipVO relationshipVO) {
+			unmappedProperty.setValue(fromRelationship(unmappedAdditionalProperty.getKey(), relationshipVO).getValue());
 		}
 		return unmappedProperty;
 	}
 
-	private <V> Optional<PropertyVO> convertToPropertyVO(V value) {
-		try {
-			return Optional.of(objectMapper.convertValue(value, PropertyVO.class));
-		} catch (IllegalArgumentException illegalArgumentException) {
-			return Optional.empty();
+	private Map.Entry<String, Object> fromRelationship(String key, RelationshipVO relationshipVO) {
+		URI idValue = relationshipVO.getObject();
+		if (relationshipVO.getAdditionalProperties() != null && !relationshipVO.getAdditionalProperties().isEmpty()) {
+			List<Map.Entry<String, Object>> entryList = new ArrayList<>(relationshipVO.getAdditionalProperties().entrySet()
+					.stream()
+					.map(entry -> {
+						if (entry.getValue() instanceof PropertyVO pvo) {
+							return fromProperty(entry.getKey(), pvo);
+						} else if (entry.getValue() instanceof RelationshipVO rvo) {
+							return fromRelationship(entry.getKey(), rvo);
+						} else {
+							throw new MappingException(String.format("Entry value is not supported. Was: %s", entry.getValue()));
+						}
+					}).toList());
+			entryList.add(new AbstractMap.SimpleEntry<>("id", idValue.toString()));
+			return new AbstractMap.SimpleEntry<>(key, entryList.stream()
+					.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+		} else {
+
+			return new AbstractMap.SimpleEntry<>(key, Map.of("id", idValue.toString()));
 		}
 	}
 
 	private Map.Entry<String, Object> fromProperty(String key, PropertyVO propertyVO) {
-		if (propertyVO.getValue() instanceof Map<?, ?> pvoMap) {
-			return new AbstractMap.SimpleEntry<>(key, pvoMap.entrySet()
+		if (propertyVO.getAdditionalProperties() != null && !propertyVO.getAdditionalProperties().isEmpty()) {
+			return new AbstractMap.SimpleEntry<>(key, propertyVO.getAdditionalProperties().entrySet()
 					.stream()
 					.map(entry -> {
-						Optional<PropertyVO> optionalPropertyVO = convertToPropertyVO(entry.getValue());
-						if (optionalPropertyVO.isPresent()) {
-							return fromProperty((String) entry.getKey(), optionalPropertyVO.get());
+						if (entry.getValue() instanceof PropertyVO pvo) {
+							return fromProperty(entry.getKey(), pvo);
+						} else if (entry.getValue() instanceof RelationshipVO rvo) {
+							return fromRelationship(entry.getKey(), rvo);
 						} else {
-							return new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue());
+							throw new MappingException(String.format("Entry value is not supported. Was: %s", entry.getValue()));
 						}
 					})
 					.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
-		}
-		if (propertyVO.getValue() instanceof PropertyVO pvv) {
-			return fromProperty(key, pvv);
 		} else {
 			return new AbstractMap.SimpleEntry<>(key, propertyVO.getValue());
 		}

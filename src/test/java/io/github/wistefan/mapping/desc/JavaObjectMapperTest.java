@@ -333,11 +333,29 @@ class JavaObjectMapperTest {
 				"The pojo should have been translated into a valid entity");
 	}
 
+	@DisplayName("Map entity with an unmapped property, containing a relationship.")
+	@Test
+	void testWithUnmappedRelationship() throws Exception {
+
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty("test", "test"));
+		unmappedProperties.add(new UnmappedProperty("complex", Map.of("something", "other", "id", "urn:ngsi-ld:entity:id")));
+
+		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		myPojoWithUnmappedProperties.setMyName("my-name");
+		myPojoWithUnmappedProperties.setUnmappedProperties(unmappedProperties);
+
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"test\":{\"value\":\"test\",\"type\":\"Property\"},\"complex\":{\"object\":\"urn:ngsi-ld:entity:id\",\"type\":\"Relationship\",\"something\":{\"value\":\"other\",\"type\":\"Property\"}},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
+
+		assertEquals(expectedJson,
+				OBJECT_MAPPER.writeValueAsString(javaObjectMapper.toEntityVO(myPojoWithUnmappedProperties)),
+				"The pojo should have been translated into a valid entity");
+	}
 
 	@DisplayName("Map entity with a complex unmapped property.")
 	@Test
 	void testWithComplexUnmappedProperties() throws Exception {
-		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"test\":{\"value\":\"test\",\"type\":\"Property\"},\"complex\":{\"value\":{\"number\":{\"value\":1,\"type\":\"Property\"},\"something\":{\"value\":\"something\",\"type\":\"Property\"}},\"type\":\"Property\"},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"test\":{\"value\":\"test\",\"type\":\"Property\"},\"complex\":{\"value\":{\"number\":{\"value\":1,\"type\":\"Property\"},\"something\":{\"value\":\"something\",\"type\":\"Property\"}},\"type\":\"Property\",\"number\":{\"value\":1,\"type\":\"Property\"},\"something\":{\"value\":\"something\",\"type\":\"Property\"}},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
 		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
 		unmappedProperties.add(new UnmappedProperty("test", "test"));
 		unmappedProperties.add(new UnmappedProperty("complex", Map.of("number", 1, "something", "something")));
@@ -354,7 +372,7 @@ class JavaObjectMapperTest {
 	@DisplayName("Map entity with a deep unmapped property.")
 	@Test
 	void testWithDeepUnmappedProperties() throws Exception {
-		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"test\":{\"value\":\"test\",\"type\":\"Property\"},\"complex\":{\"value\":{\"number\":{\"value\":1,\"type\":\"Property\"},\"deep\":{\"value\":{\"something\":{\"value\":\"deep\",\"type\":\"Property\"}},\"type\":\"Property\"}},\"type\":\"Property\"},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"test\":{\"value\":\"test\",\"type\":\"Property\"},\"complex\":{\"value\":{\"number\":{\"value\":1,\"type\":\"Property\"},\"deep\":{\"value\":{\"something\":{\"value\":\"deep\",\"type\":\"Property\"}},\"type\":\"Property\",\"something\":{\"value\":\"deep\",\"type\":\"Property\"}}},\"type\":\"Property\",\"number\":{\"value\":1,\"type\":\"Property\"},\"deep\":{\"value\":{\"something\":{\"value\":\"deep\",\"type\":\"Property\"}},\"type\":\"Property\",\"something\":{\"value\":\"deep\",\"type\":\"Property\"}}},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
 		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
 		unmappedProperties.add(new UnmappedProperty("test", "test"));
 		unmappedProperties.add(new UnmappedProperty("complex", Map.of("number", 1, "deep", Map.of("something", "deep"))));
