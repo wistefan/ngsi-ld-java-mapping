@@ -252,15 +252,46 @@ public class EntityVOMapper extends Mapper {
 	private UnmappedProperty toUnmappedProperty(Map.Entry<String, AdditionalPropertyVO> unmappedAdditionalProperty) {
 		UnmappedProperty unmappedProperty = new UnmappedProperty();
 		unmappedProperty.setName(unmappedAdditionalProperty.getKey());
+
 		if (unmappedAdditionalProperty.getValue() instanceof PropertyListVO propertyListVO) {
 			unmappedProperty.setValue(
 					propertyListVO.stream()
-							.map(PropertyVO::getValue)
+							.map(pvo -> fromProperty(unmappedAdditionalProperty.getKey(), pvo))
+							.map(Map.Entry::getValue)
 							.toList());
 		} else if (unmappedAdditionalProperty.getValue() instanceof PropertyVO propertyVO) {
-			unmappedProperty.setValue(propertyVO.getValue());
+			unmappedProperty.setValue(fromProperty(unmappedAdditionalProperty.getKey(), propertyVO).getValue());
 		}
 		return unmappedProperty;
+	}
+
+	private <V> Optional<PropertyVO> convertToPropertyVO(V value) {
+		try {
+			return Optional.of(objectMapper.convertValue(value, PropertyVO.class));
+		} catch (IllegalArgumentException illegalArgumentException) {
+			return Optional.empty();
+		}
+	}
+
+	private Map.Entry<String, Object> fromProperty(String key, PropertyVO propertyVO) {
+		if (propertyVO.getValue() instanceof Map<?, ?> pvoMap) {
+			return new AbstractMap.SimpleEntry<>(key, pvoMap.entrySet()
+					.stream()
+					.map(entry -> {
+						Optional<PropertyVO> optionalPropertyVO = convertToPropertyVO(entry.getValue());
+						if (optionalPropertyVO.isPresent()) {
+							return fromProperty((String) entry.getKey(), optionalPropertyVO.get());
+						} else {
+							return new AbstractMap.SimpleEntry<>(entry.getKey(), entry.getValue());
+						}
+					})
+					.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+		}
+		if (propertyVO.getValue() instanceof PropertyVO pvv) {
+			return fromProperty(key, pvv);
+		} else {
+			return new AbstractMap.SimpleEntry<>(key, propertyVO.getValue());
+		}
 	}
 
 	/**

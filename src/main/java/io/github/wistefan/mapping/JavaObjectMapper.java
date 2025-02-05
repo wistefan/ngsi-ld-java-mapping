@@ -348,14 +348,39 @@ public class JavaObjectMapper extends Mapper {
 	}
 
 	private Map.Entry<String, AdditionalPropertyVO> unmappedPropertyToAdditionalProperty(UnmappedProperty unmappedProperty) {
-		if (unmappedProperty.getValue() instanceof List<?> properties) {
+		AdditionalPropertyVO additionalPropertyVO = objectToAdditionalProperty(unmappedProperty.getValue());
+		return new AbstractMap.SimpleEntry<>(unmappedProperty.getName(), additionalPropertyVO);
+
+	}
+
+	private AdditionalPropertyVO objectToAdditionalProperty(Object o) {
+		if (o instanceof Map<?, ?> objectMap) {
+			PropertyVO propertyVO = new PropertyVO();
+			Map<String, AdditionalPropertyVO> values = new HashMap<>();
+			objectMap.forEach((key, value) -> {
+				if (key instanceof String name) {
+					values.put(name, objectToAdditionalProperty(value));
+				} else {
+					throw new MappingException(String.format("Only string keys are supported, but was %s", key));
+				}
+			});
+			return propertyVO.value(values);
+		} else if (o instanceof List<?> objectList) {
 			PropertyListVO propertyVOS = new PropertyListVO();
-			properties.stream()
-					.map(property -> new PropertyVO().value(property))
+			// as of now, we dont support property lists of property lists
+			objectList.stream()
+					.map(this::objectToAdditionalProperty)
+					.map(apvo -> {
+						if (apvo instanceof PropertyVO pvo) {
+							return pvo;
+						}
+						throw new MappingException("Propertylists of Propertylists are not supported.");
+					})
 					.forEach(propertyVOS::add);
-			return new AbstractMap.SimpleEntry<>(unmappedProperty.getName(), propertyVOS);
+			return propertyVOS;
 		} else {
-			return new AbstractMap.SimpleEntry<>(unmappedProperty.getName(), new PropertyVO().value(unmappedProperty.getValue()));
+			PropertyVO propertyVO = new PropertyVO().value(o);
+			return propertyVO;
 		}
 	}
 
