@@ -353,30 +353,67 @@ public class JavaObjectMapper extends Mapper {
 
 	}
 
+	private AdditionalPropertyVO mapToRelationship(Map<?, ?> objectMap) {
+		RelationshipVO relationshipVO = new RelationshipVO();
+		if (objectMap.get(ID_PROPERTY) instanceof String id) {
+			relationshipVO.setObject(URI.create(id));
+		} else {
+			throw new MappingException(String.format("The id is not a valid id. Object is %s", objectMap.get(ID_PROPERTY)));
+		}
+		objectMap.forEach((key, value) -> {
+			if (key instanceof String name) {
+				if (name.equals(ID_PROPERTY)) {
+					return;
+				}
+				relationshipVO.setAdditionalProperties(name, objectToAdditionalProperty(value));
+			} else {
+				throw new MappingException(String.format("Only string keys are supported, but was %s", key));
+			}
+		});
+		return relationshipVO;
+	}
+
 	private AdditionalPropertyVO objectToAdditionalProperty(Object o) {
 		if (o instanceof Map<?, ?> objectMap) {
-			PropertyVO propertyVO = new PropertyVO();
-			Map<String, AdditionalPropertyVO> values = new HashMap<>();
-			objectMap.forEach((key, value) -> {
-				if (key instanceof String name) {
-					values.put(name, objectToAdditionalProperty(value));
-				} else {
-					throw new MappingException(String.format("Only string keys are supported, but was %s", key));
-				}
-			});
-			return propertyVO.value(values);
+			if (objectMap.containsKey(ID_PROPERTY)) {
+				// contains key "id" -> relationship
+				return mapToRelationship(objectMap);
+			} else {
+				PropertyVO propertyVO = new PropertyVO();
+				Map<String, AdditionalPropertyVO> values = new HashMap<>();
+				objectMap.forEach((key, value) -> {
+					if (key instanceof String name) {
+						propertyVO.setAdditionalProperties(name, objectToAdditionalProperty(value));
+						values.put(name, objectToAdditionalProperty(value));
+					} else {
+						throw new MappingException(String.format("Only string keys are supported, but was %s", key));
+					}
+				});
+				return propertyVO.value(values);
+			}
 		} else if (o instanceof List<?> objectList) {
 			PropertyListVO propertyVOS = new PropertyListVO();
-			// as of now, we dont support property lists of property lists
+			RelationshipListVO relationshipVOS = new RelationshipListVO();
+			// as of now, we don't support property lists of property lists
 			objectList.stream()
 					.map(this::objectToAdditionalProperty)
-					.map(apvo -> {
+					.forEach(apvo -> {
 						if (apvo instanceof PropertyVO pvo) {
-							return pvo;
+							propertyVOS.add(pvo);
 						}
-						throw new MappingException("Propertylists of Propertylists are not supported.");
-					})
-					.forEach(propertyVOS::add);
+						if (apvo instanceof RelationshipVO rvo) {
+							relationshipVOS.add(rvo);
+						}
+					});
+			if (!propertyVOS.isEmpty() && !relationshipVOS.isEmpty()) {
+				throw new MappingException("Mixed lists are not supported");
+			}
+			if (!propertyVOS.isEmpty()) {
+				return propertyVOS;
+			}
+			if (!relationshipVOS.isEmpty()) {
+				return relationshipVOS;
+			}
 			return propertyVOS;
 		} else {
 			PropertyVO propertyVO = new PropertyVO().value(o);
