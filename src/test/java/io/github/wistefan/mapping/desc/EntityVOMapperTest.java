@@ -92,7 +92,7 @@ class EntityVOMapperTest {
 		expectedPojo.setMyName("my-name");
 		expectedPojo.setUnmappedProperties(unmappedProperties);
 
-		String entityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"test\":[{\"value\":1,\"type\":\"Property\"},{\"value\":2,\"type\":\"Property\"},{\"value\":3,\"type\":\"Property\"}],\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
+		String entityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"test\":{\"value\":[1,2,3],\"type\":\"Property\"},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
 		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
 
 		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = entityVOMapper.fromEntityVO(theEntity, MyPojoWithUnmappedProperties.class).block();
@@ -110,7 +110,7 @@ class EntityVOMapperTest {
 		expectedPojo.setMyName("my-name");
 		expectedPojo.setUnmappedProperties(unmappedProperties);
 
-		String entityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"other\":{\"value\":\"property\",\"type\":\"Property\"},\"test\":[{\"value\":1,\"type\":\"Property\"},{\"value\":2,\"type\":\"Property\"},{\"value\":3,\"type\":\"Property\"}],\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
+		String entityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"other\":{\"value\":\"property\",\"type\":\"Property\"},\"test\":{\"value\":[1,2,3],\"type\":\"Property\"},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
 		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
 
 		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = entityVOMapper.fromEntityVO(theEntity, MyPojoWithUnmappedProperties.class).block();

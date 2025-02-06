@@ -391,34 +391,51 @@ public class JavaObjectMapper extends Mapper {
 				});
 				return propertyVO.value(values);
 			}
-		} else if (o instanceof List<?> objectList) {
-			PropertyListVO propertyVOS = new PropertyListVO();
-			RelationshipListVO relationshipVOS = new RelationshipListVO();
-			// as of now, we don't support property lists of property lists
-			objectList.stream()
-					.map(this::objectToAdditionalProperty)
-					.forEach(apvo -> {
-						if (apvo instanceof PropertyVO pvo) {
-							propertyVOS.add(pvo);
-						}
-						if (apvo instanceof RelationshipVO rvo) {
-							relationshipVOS.add(rvo);
-						}
-					});
-			if (!propertyVOS.isEmpty() && !relationshipVOS.isEmpty()) {
-				throw new MappingException("Mixed lists are not supported");
-			}
-			if (!propertyVOS.isEmpty()) {
+		} else if (o instanceof List<?> objectList && !objectList.isEmpty()) {
+			if (isPlain(objectList.get(0))) {
+				return new PropertyVO().value(objectList);
+			} else {
+				PropertyListVO propertyVOS = new PropertyListVO();
+				RelationshipListVO relationshipVOS = new RelationshipListVO();
+				// as of now, we don't support property lists of property lists
+				objectList.stream()
+						.map(this::objectToAdditionalProperty)
+						.forEach(apvo -> {
+							if (apvo instanceof PropertyVO pvo) {
+								propertyVOS.add(pvo);
+							}
+							if (apvo instanceof RelationshipVO rvo) {
+								relationshipVOS.add(rvo);
+							}
+						});
+				if (!propertyVOS.isEmpty() && !relationshipVOS.isEmpty()) {
+					throw new MappingException("Mixed lists are not supported");
+				}
+				if (!propertyVOS.isEmpty()) {
+					return propertyVOS;
+				}
+				if (!relationshipVOS.isEmpty()) {
+					return relationshipVOS;
+				}
 				return propertyVOS;
 			}
-			if (!relationshipVOS.isEmpty()) {
-				return relationshipVOS;
-			}
-			return propertyVOS;
 		} else {
 			PropertyVO propertyVO = new PropertyVO().value(o);
 			return propertyVO;
 		}
+	}
+
+	private boolean isPlain(Object o) {
+		if (o instanceof Number) {
+			return true;
+		}
+		if (o instanceof String) {
+			return true;
+		}
+		if (o instanceof Boolean) {
+			return true;
+		}
+		return false;
 	}
 
 	private <T> Map<String, AdditionalPropertyVO> buildUnmappedProperties(T entity, Method method) {
