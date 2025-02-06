@@ -389,8 +389,7 @@ class JavaObjectMapperTest {
 	@DisplayName("Map entity with an unmapped property list.")
 	@Test
 	void testWithUnmappedPropertiesList() throws Exception {
-		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"test\":[{\"value\":1,\"type\":\"Property\"},{\"value\":2,\"type\":\"Property\"},{\"value\":3,\"type\":\"Property\"}],\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
-
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"test\":{\"value\":[1,2,3],\"type\":\"Property\"},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
 		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
 		unmappedProperties.add(new UnmappedProperty("test", List.of(1, 2, 3)));
 
@@ -407,8 +406,7 @@ class JavaObjectMapperTest {
 	@DisplayName("Map entity with multiple unmapped properties.")
 	@Test
 	void testWithMultipleUnmappedProperties() throws Exception {
-		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"other\":{\"value\":\"property\",\"type\":\"Property\"},\"test\":[{\"value\":1,\"type\":\"Property\"},{\"value\":2,\"type\":\"Property\"},{\"value\":3,\"type\":\"Property\"}],\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
-
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"other\":{\"value\":\"property\",\"type\":\"Property\"},\"test\":{\"value\":[1,2,3],\"type\":\"Property\"},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
 		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
 		unmappedProperties.add(new UnmappedProperty("test", List.of(1, 2, 3)));
 		unmappedProperties.add(new UnmappedProperty("other", "property"));
