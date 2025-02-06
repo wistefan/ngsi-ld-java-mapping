@@ -424,7 +424,9 @@ public class JavaObjectMapper extends Mapper {
 	private <T> Map<String, AdditionalPropertyVO> buildUnmappedProperties(T entity, Method method) {
 		try {
 			Object unmappedProperties = method.invoke(entity);
-			if (unmappedProperties instanceof List<?> unmappedPropertiesList) {
+			if (unmappedProperties == null) {
+				return Map.of();
+			} else if (unmappedProperties instanceof List<?> unmappedPropertiesList) {
 				List<UnmappedProperty> theList = unmappedPropertiesList
 						.stream()
 						.filter(UnmappedProperty.class::isInstance)
