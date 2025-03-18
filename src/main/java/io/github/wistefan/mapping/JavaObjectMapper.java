@@ -7,6 +7,7 @@ import org.fiware.ngsi.model.*;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
@@ -465,7 +466,7 @@ public class JavaObjectMapper extends Mapper {
 	/**
 	 * Build properties from the declared methods
 	 */
-	private <T> Map<String, PropertyVO> buildProperties(T entity, List<Method> propertyMethods) {
+	private <T> Map<String, AdditionalPropertyVO> buildProperties(T entity, List<Method> propertyMethods) {
 		return propertyMethods.stream()
 				.map(propertyMethod -> methodToPropertyEntry(entity, propertyMethod))
 				.filter(Optional::isPresent)
@@ -537,7 +538,7 @@ public class JavaObjectMapper extends Mapper {
 	/**
 	 * Build a property entry from the given method on the entity
 	 */
-	private <T> Optional<Map.Entry<String, PropertyVO>> methodToPropertyEntry(T entity, Method method) {
+	private <T> Optional<Map.Entry<String, AdditionalPropertyVO>> methodToPropertyEntry(T entity, Method method) {
 		try {
 			Object propertyObject = method.invoke(entity);
 			if (propertyObject == null) {
@@ -546,13 +547,36 @@ public class JavaObjectMapper extends Mapper {
 			AttributeGetter attributeMapping = getAttributeGetter(method.getAnnotations()).orElseThrow(
 					() -> new MappingException(String.format(NO_MAPPING_DEFINED_FOR_METHOD_TEMPLATE, method)));
 
-			PropertyVO propertyVO = new PropertyVO();
-			propertyVO.setValue(propertyObject);
+			if (isPlain(propertyObject)) {
+				PropertyVO propertyVO = new PropertyVO();
+				propertyVO.setValue(propertyObject);
+				return Optional.of(new AbstractMap.SimpleEntry<>(attributeMapping.targetName(), propertyVO));
+			} else if (propertyObject instanceof List) {
+				AdditionalPropertyVO additionalProperty = objectToAdditionalProperty(propertyObject);
+				return Optional.of(new AbstractMap.SimpleEntry<>(attributeMapping.targetName(), additionalProperty));
+			} else {
+				AdditionalPropertyVO additionalProperty = objectToAdditionalProperty(toMap(propertyObject));
+				if (additionalProperty instanceof PropertyVO) {
+					((PropertyVO) additionalProperty).setValue(propertyObject);
+				}
+				return Optional.of(new AbstractMap.SimpleEntry<>(attributeMapping.targetName(), additionalProperty));
+			}
 
-			return Optional.of(new AbstractMap.SimpleEntry<>(attributeMapping.targetName(), propertyVO));
 		} catch (IllegalAccessException | InvocationTargetException e) {
 			throw new MappingException(String.format(WAS_NOT_ABLE_INVOKE_METHOD_TEMPLATE, method, entity));
 		}
+	}
+
+	public static Map<String, Object> toMap(Object obj) {
+		Map<String, Object> map = new HashMap<>();
+		for (Field field : obj.getClass().getDeclaredFields()) {
+			field.setAccessible(true);
+			try {
+				map.put(field.getName(), field.get(obj));
+			} catch (Exception e) {
+			}
+		}
+		return map;
 	}
 
 	/**
@@ -649,9 +673,10 @@ public class JavaObjectMapper extends Mapper {
 			relationshipVO.setObject((URI) objectObject);
 			relationshipVO.setDatasetId((URI) datasetIdObject);
 
+
 			// get additional properties. We do not support more depth/complexity for now
-			Map<String, AdditionalPropertyVO> additionalProperties = getAttributeGettersMethods(
-					relationShipObject).stream()
+			Map<String, AdditionalPropertyVO> additionalProperties = getAttributeGettersMethods(relationShipObject)
+					.stream()
 					.map(getterMethod -> getAdditionalPropertyEntryFromMethod(relationShipObject, getterMethod))
 					.filter(Optional::isPresent)
 					.map(Optional::get)
@@ -669,8 +694,8 @@ public class JavaObjectMapper extends Mapper {
 	/**
 	 * Get all additional properties for the object of the relationship
 	 */
-	private Optional<Map.Entry<String, PropertyVO>> getAdditionalPropertyEntryFromMethod(Object relationShipObject,
-																						 Method getterMethod) {
+	private Optional<Map.Entry<String, AdditionalPropertyVO>> getAdditionalPropertyEntryFromMethod(Object relationShipObject,
+																								   Method getterMethod) {
 		Optional<AttributeGetter> optionalAttributeGetter = getAttributeGetter(getterMethod.getAnnotations());
 		if (optionalAttributeGetter.isEmpty() || !optionalAttributeGetter.get().embedProperty()) {
 			return Optional.empty();
