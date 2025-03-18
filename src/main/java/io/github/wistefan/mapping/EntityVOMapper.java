@@ -286,7 +286,9 @@ public class EntityVOMapper extends Mapper {
 						} else {
 							throw new MappingException(String.format("Entry value is not supported. Was: %s", entry.getValue()));
 						}
-					}).toList());
+					})
+					.filter(entry -> entry.getValue() != null)
+					.toList());
 			entryList.add(new AbstractMap.SimpleEntry<>("id", idValue.toString()));
 			return new AbstractMap.SimpleEntry<>(key, entryList.stream()
 					.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
@@ -309,6 +311,7 @@ public class EntityVOMapper extends Mapper {
 							throw new MappingException(String.format("Entry value is not supported. Was: %s", entry.getValue()));
 						}
 					})
+					.filter(entry -> entry.getValue() != null)
 					.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
 		} else {
 			return new AbstractMap.SimpleEntry<>(key, propertyVO.getValue());

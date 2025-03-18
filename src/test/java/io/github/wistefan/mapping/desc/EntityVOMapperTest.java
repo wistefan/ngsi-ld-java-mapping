@@ -171,6 +171,43 @@ class EntityVOMapperTest {
 		assertEquals(expectedPojo, myPojoWithUnmappedProperties, "The full pojo should be returned.");
 	}
 
+	@DisplayName("Map Pojo with a field that is an object.")
+	@Test
+	void testSubPropertyMapping() throws JsonProcessingException {
+		MyPojoWithSubProperty expectedPojo = new MyPojoWithSubProperty("urn:ngsi-ld:complex-pojo:the-test-pojo");
+		MySubProperty mySubProperty = new MySubProperty();
+		mySubProperty.setPropertyName("My property");
+		expectedPojo.setMySubProperty(mySubProperty);
+
+		String entityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"mySubProperty\":{\"value\":{\"propertyName\":\"My property\"},\"type\":\"Property\",\"propertyName\":{\"value\":\"My property\",\"type\":\"Property\"}}}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithSubProperty myPojoWithSubProperty = entityVOMapper.fromEntityVO(theEntity, MyPojoWithSubProperty.class).block();
+		assertEquals(expectedPojo, myPojoWithSubProperty, "The full pojo should be returned.");
+	}
+
+	@DisplayName("Map Pojo with a field that is a list of objects.")
+	@Test
+	void testListOfSubPropertyMapping() throws JsonProcessingException {
+		MyPojoWithListOfSubProperty expectedPojo = new MyPojoWithListOfSubProperty(
+				"urn:ngsi-ld:complex-pojo:the-test-pojo");
+		MySubProperty mySubProperty1 = new MySubProperty();
+		mySubProperty1.setPropertyName("My property 1");
+		MySubProperty mySubProperty2 = new MySubProperty();
+		mySubProperty2.setPropertyName("My property 2");
+		expectedPojo.setMySubProperties(List.of(mySubProperty1, mySubProperty2));
+
+		String entityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"mySubProperty\":[{\"value\":{\"propertyName\":\"My property 1\"},\"type\":\"Property\"},{\"value\":{\"propertyName\":\"My property 2\"},\"type\":\"Property\"}]}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithListOfSubProperty myPojoWithListOfSubProperty = entityVOMapper.fromEntityVO(theEntity, MyPojoWithListOfSubProperty.class).block();
+		assertEquals(expectedPojo, myPojoWithListOfSubProperty, "The full pojo should be returned.");
+	}
+
+
+
+
+
 	@DisplayName("Map entity containing a relationship that could not be resolved with strict-mapping disabled.")
 	@Test
 	void testSubEntityMappingNoStrict() throws JsonProcessingException {
