@@ -375,24 +375,7 @@ public class JavaObjectMapper extends Mapper {
 	}
 
 	private AdditionalPropertyVO objectToAdditionalProperty(Object o) {
-		if (o instanceof Map<?, ?> objectMap) {
-			if (objectMap.containsKey(ID_PROPERTY)) {
-				// contains key "id" -> relationship
-				return mapToRelationship(objectMap);
-			} else {
-				PropertyVO propertyVO = new PropertyVO();
-				Map<String, AdditionalPropertyVO> values = new HashMap<>();
-				objectMap.forEach((key, value) -> {
-					if (key instanceof String name) {
-						propertyVO.setAdditionalProperties(name, objectToAdditionalProperty(value));
-						values.put(name, objectToAdditionalProperty(value));
-					} else {
-						throw new MappingException(String.format("Only string keys are supported, but was %s", key));
-					}
-				});
-				return propertyVO.value(values);
-			}
-		} else if (o instanceof List<?> objectList && !objectList.isEmpty()) {
+		if (o instanceof List<?> objectList && !objectList.isEmpty()) {
 			if (isPlain(objectList.get(0))) {
 				return new PropertyVO().value(objectList);
 			} else {
@@ -420,9 +403,33 @@ public class JavaObjectMapper extends Mapper {
 				}
 				return propertyVOS;
 			}
-		} else {
+		} else if (isPlain(o)) {
 			PropertyVO propertyVO = new PropertyVO().value(o);
 			return propertyVO;
+		} else {
+			Map<?, ?> objectMap = new HashMap<>();
+			if (o instanceof Map<?, ?> om) {
+				objectMap = om;
+			} else {
+				objectMap = toMap(o);
+			}
+
+			if (objectMap.containsKey(ID_PROPERTY)) {
+				// contains key "id" -> relationship
+				return mapToRelationship(objectMap);
+			} else {
+				PropertyVO propertyVO = new PropertyVO();
+				Map<String, AdditionalPropertyVO> values = new HashMap<>();
+				objectMap.forEach((key, value) -> {
+					if (key instanceof String name) {
+						propertyVO.setAdditionalProperties(name, objectToAdditionalProperty(value));
+						values.put(name, objectToAdditionalProperty(value));
+					} else {
+						throw new MappingException(String.format("Only string keys are supported, but was %s", key));
+					}
+				});
+				return propertyVO.value(values);
+			}
 		}
 	}
 

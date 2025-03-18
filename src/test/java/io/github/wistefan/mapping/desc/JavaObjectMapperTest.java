@@ -75,8 +75,7 @@ class JavaObjectMapperTest {
 	@DisplayName("Map Pojo with a field that is an object.")
 	@Test
 	void testSubPropertyMapping() throws JsonProcessingException {
-		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"mySubProperty\":{\"value\":{\"propertyName\":\"My property\"},\"type\":\"Property\"}}";
-
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"mySubProperty\":{\"value\":{\"propertyName\":\"My property\"},\"type\":\"Property\",\"propertyName\":{\"value\":\"My property\",\"type\":\"Property\"}}}";
 		MyPojoWithSubProperty myComplexPojo = new MyPojoWithSubProperty("urn:ngsi-ld:complex-pojo:the-test-pojo");
 		MySubProperty mySubProperty = new MySubProperty();
 		mySubProperty.setPropertyName("My property");
@@ -89,7 +88,7 @@ class JavaObjectMapperTest {
 	@DisplayName("Map Pojo with a field that is a list of objects.")
 	@Test
 	void testListOfSubPropertyMapping() throws JsonProcessingException {
-		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"mySubProperty\":[{\"value\":{\"propertyName\":\"My property 1\"},\"type\":\"Property\"},{\"value\":{\"propertyName\":\"My property 2\"},\"type\":\"Property\"}]}";
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"mySubProperty\":[{\"value\":{\"propertyName\":{\"value\":\"My property 1\",\"type\":\"Property\"}},\"type\":\"Property\",\"propertyName\":{\"value\":\"My property 1\",\"type\":\"Property\"}},{\"value\":{\"propertyName\":{\"value\":\"My property 2\",\"type\":\"Property\"}},\"type\":\"Property\",\"propertyName\":{\"value\":\"My property 2\",\"type\":\"Property\"}}]}";
 		MyPojoWithListOfSubProperty myComplexPojo = new MyPojoWithListOfSubProperty(
 				"urn:ngsi-ld:complex-pojo:the-test-pojo");
 		MySubProperty mySubProperty1 = new MySubProperty();
