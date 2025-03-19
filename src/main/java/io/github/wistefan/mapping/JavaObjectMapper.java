@@ -575,6 +575,9 @@ public class JavaObjectMapper extends Mapper {
 	}
 
 	public static Map<String, Object> toMap(Object obj) {
+		if(obj == null) {
+			return Map.of();
+		}
 		Map<String, Object> map = new HashMap<>();
 		for (Field field : obj.getClass().getDeclaredFields()) {
 			field.setAccessible(true);
