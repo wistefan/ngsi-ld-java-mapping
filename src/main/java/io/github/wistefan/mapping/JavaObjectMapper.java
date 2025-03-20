@@ -1,5 +1,7 @@
 package io.github.wistefan.mapping;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.wistefan.mapping.annotations.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -7,10 +9,10 @@ import org.fiware.ngsi.model.*;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -26,6 +28,7 @@ public class JavaObjectMapper extends Mapper {
 	// name of the property containing the ID
 	private static final String ID_PROPERTY = "id";
 	private final MappingProperties mappingProperties;
+	private final ObjectMapper objectMapper;
 
 	public static final String NO_MAPPING_DEFINED_FOR_METHOD_TEMPLATE = "No mapping defined for method %s";
 	public static final String WAS_NOT_ABLE_INVOKE_METHOD_TEMPLATE = "Was not able invoke method %s on %s";
@@ -185,9 +188,7 @@ public class JavaObjectMapper extends Mapper {
 				getAttributeGetter(method.getAnnotations()).ifPresent(annotation -> {
 					switch (annotation.value()) {
 						case PROPERTY -> propertyMethods.add(method);
-						// We handle property lists the same way as properties, since it is mapped as a property which value is a json array.
-						// A real NGSI-LD property list would require a datasetId, that is not provided here.
-						case PROPERTY_LIST -> propertyMethods.add(method);
+						case PROPERTY_LIST -> propertyListMethods.add(method);
 						case GEO_PROPERTY -> geoPropertyMethods.add(method);
 						case RELATIONSHIP -> relationshipMethods.add(method);
 						case GEO_PROPERTY_LIST -> geoPropertyListMethods.add(method);
@@ -443,6 +444,16 @@ public class JavaObjectMapper extends Mapper {
 		if (o instanceof Boolean) {
 			return true;
 		}
+		if (o instanceof URI) {
+			return true;
+		}
+		if (o instanceof Instant) {
+			return true;
+		}
+		if(o instanceof Enum<?>) {
+			return true;
+		}
+
 		return false;
 	}
 
@@ -562,6 +573,10 @@ public class JavaObjectMapper extends Mapper {
 				AdditionalPropertyVO additionalProperty = objectToAdditionalProperty(propertyObject);
 				return Optional.of(new AbstractMap.SimpleEntry<>(attributeMapping.targetName(), additionalProperty));
 			} else {
+				Map<String, Object> propertyObjectMap = toMap(propertyObject);
+				if (propertyObjectMap.isEmpty()) {
+					return Optional.empty();
+				}
 				AdditionalPropertyVO additionalProperty = objectToAdditionalProperty(toMap(propertyObject));
 				if (additionalProperty instanceof PropertyVO) {
 					((PropertyVO) additionalProperty).setValue(propertyObject);
@@ -574,16 +589,11 @@ public class JavaObjectMapper extends Mapper {
 		}
 	}
 
-	public static Map<String, Object> toMap(Object obj) {
-		Map<String, Object> map = new HashMap<>();
-		for (Field field : obj.getClass().getDeclaredFields()) {
-			field.setAccessible(true);
-			try {
-				map.put(field.getName(), field.get(obj));
-			} catch (Exception e) {
-			}
+	public Map<String, Object> toMap(Object obj) {
+		if (obj == null || obj instanceof Collection<?>) {
+			return Map.of();
 		}
-		return map;
+		return objectMapper.convertValue(obj, new TypeReference<Map<String, Object>>() {});
 	}
 
 	/**
@@ -732,15 +742,28 @@ public class JavaObjectMapper extends Mapper {
 			List<Object> entityObjects = (List) o;
 
 			PropertyListVO propertyVOS = new PropertyListVO();
-
-			propertyVOS.addAll(entityObjects.stream()
+			entityObjects.stream()
 					.map(propertyObject -> {
 						PropertyVO propertyVO = new PropertyVO();
-						propertyVO.setValue(propertyObject);
+						if (isPlain(propertyObject)) {
+							propertyVO.setValue(propertyObject);
+						} else {
+							Map<String, Object> propertyObjectMap = toMap(propertyObject);
+							if (propertyObjectMap.isEmpty()) {
+								return null;
+							}
+							AdditionalPropertyVO additionalProperty = objectToAdditionalProperty(propertyObjectMap);
+							if (additionalProperty instanceof PropertyVO pvo) {
+								propertyVO = pvo.value(propertyObject);
+							}
+						}
 						return propertyVO;
 					})
-					.toList());
-
+					.filter(Objects::nonNull)
+					.forEach(propertyVOS::add);
+			if (propertyVOS.size() > 1) {
+				propertyVOS.forEach(propertyVO -> propertyVO.setDatasetId(URI.create("urn:uuid:" + UUID.randomUUID())));
+			}
 			return Optional.of(new AbstractMap.SimpleEntry<>(attributeMapping.targetName(), propertyVOS));
 		} catch (IllegalAccessException | InvocationTargetException e) {
 			throw new MappingException(String.format(WAS_NOT_ABLE_INVOKE_METHOD_TEMPLATE, method, entity));
