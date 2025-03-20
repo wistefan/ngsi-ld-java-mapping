@@ -5,23 +5,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.wistefan.mapping.*;
 import io.github.wistefan.mapping.desc.pojos.*;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyInvalidListRelationshipPojo;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyInvalidRelationshipPojo;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithInvalidSubEntity;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithMultipleIds;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithMultipleTypes;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithPrivateId;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithPrivateType;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithWrongIdType;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithWrongTypeType;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithoutId;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithoutType;
-import io.github.wistefan.mapping.desc.pojos.invalid.MySubEntityWithNonURIDatasetId;
-import io.github.wistefan.mapping.desc.pojos.invalid.MySubEntityWithNonURIRelObject;
-import io.github.wistefan.mapping.desc.pojos.invalid.MySubEntityWithoutRelationshipObject;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyThrowingPojo;
+import io.github.wistefan.mapping.desc.pojos.invalid.*;
 import org.fiware.ngsi.model.AdditionalPropertyVO;
 import org.fiware.ngsi.model.EntityVO;
+import org.fiware.ngsi.model.PropertyListVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,15 +18,11 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
+import static org.junit.jupiter.api.Assertions.*;
 
 class JavaObjectMapperTest {
 	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -48,7 +31,7 @@ class JavaObjectMapperTest {
 
 	@BeforeEach
 	public void setup() {
-		javaObjectMapper = new JavaObjectMapper(new MappingProperties());
+		javaObjectMapper = new JavaObjectMapper(new MappingProperties(), new ObjectMapper());
 		OBJECT_MAPPER.setSerializationInclusion(JsonInclude.Include.NON_NULL);
 		OBJECT_MAPPER
 				.addMixIn(AdditionalPropertyVO.class, AdditionalPropertyMixin.class);
@@ -88,7 +71,7 @@ class JavaObjectMapperTest {
 	@DisplayName("Map Pojo with a field that is a list of objects.")
 	@Test
 	void testListOfSubPropertyMapping() throws JsonProcessingException {
-		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"mySubProperty\":[{\"value\":{\"propertyName\":{\"value\":\"My property 1\",\"type\":\"Property\"}},\"type\":\"Property\",\"propertyName\":{\"value\":\"My property 1\",\"type\":\"Property\"}},{\"value\":{\"propertyName\":{\"value\":\"My property 2\",\"type\":\"Property\"}},\"type\":\"Property\",\"propertyName\":{\"value\":\"My property 2\",\"type\":\"Property\"}}]}";
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"mySubProperty\":[{\"value\":{\"propertyName\":\"My property 1\"},\"type\":\"Property\",\"propertyName\":{\"value\":\"My property 1\",\"type\":\"Property\"}},{\"value\":{\"propertyName\":\"My property 2\"},\"type\":\"Property\",\"propertyName\":{\"value\":\"My property 2\",\"type\":\"Property\"}}]}";
 		MyPojoWithListOfSubProperty myComplexPojo = new MyPojoWithListOfSubProperty(
 				"urn:ngsi-ld:complex-pojo:the-test-pojo");
 		MySubProperty mySubProperty1 = new MySubProperty();
@@ -97,7 +80,18 @@ class JavaObjectMapperTest {
 		mySubProperty2.setPropertyName("My property 2");
 		myComplexPojo.setMySubProperties(List.of(mySubProperty1, mySubProperty2));
 
-		assertEquals(expectedJson, OBJECT_MAPPER.writeValueAsString(javaObjectMapper.toEntityVO(myComplexPojo)),
+		EntityVO entityVO = javaObjectMapper.toEntityVO(myComplexPojo);
+		AdditionalPropertyVO additionalPropertyVO = entityVO.getAdditionalProperties().get("mySubProperty");
+		assertTrue(additionalPropertyVO instanceof PropertyListVO);
+
+		PropertyListVO plVO = (PropertyListVO) additionalPropertyVO;
+		plVO.forEach(pvo -> assertNotNull(pvo.getDatasetId(), "Each entry should have a datasetId"));
+
+		PropertyListVO cleanedPropertyVOS = new PropertyListVO();
+		plVO.stream().map(propertyVO -> propertyVO.datasetId(null)).forEach(cleanedPropertyVOS::add);
+
+		entityVO.getAdditionalProperties().put("mySubProperty", cleanedPropertyVOS);
+		assertEquals(expectedJson, OBJECT_MAPPER.writeValueAsString(entityVO),
 				"The pojo should have been translated into a valid entity");
 	}
 

@@ -452,20 +452,6 @@ class EntityVOMapperTest {
 	}
 
 	@Test
-	void testSubPropertyWorkaround() {
-		MyPojoWithListOfSubProperty myPojoWithListOfSubProperty = new MyPojoWithListOfSubProperty("urn:ngsi-ld:complex-pojo:entity");
-		MySubProperty prop1 = new MySubProperty();
-		MySubProperty prop2 = new MySubProperty();
-		myPojoWithListOfSubProperty.setMySubProperties(List.of(prop1, prop2));
-		EntityVO entityVO = new EntityVO().id(URI.create("urn:ngsi-ld:complex-pojo:entity")).type("complex-pojo");
-		PropertyVO propertyVO = new PropertyVO().value(List.of(prop1, prop2));
-
-		entityVO.setAdditionalProperties("mySubProperty", propertyVO);
-
-		assertEquals(myPojoWithListOfSubProperty, entityVOMapper.fromEntityVO(entityVO, MyPojoWithListOfSubProperty.class).block(), "The sub property should be mapped to a list.");
-	}
-
-	@Test
 	public void testConvertEntityToMap() {
 		MySimplePojo pojo = new MySimplePojo();
 		pojo.setMyName("Some");

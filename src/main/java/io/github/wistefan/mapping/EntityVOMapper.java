@@ -355,14 +355,12 @@ public class EntityVOMapper extends Mapper {
 			//we need special handling here, since we have no real property lists(see NGSI-LD issue)
 			// TODO: remove as soon as ngsi-ld does properly support that.
 			if (propertyVO.getValue() instanceof List propertyList) {
-				return invokeWithExceptionHandling(setter, objectUnderConstruction, propertyList.stream()
-						.map(listValue -> objectMapper.convertValue(listValue, setterAnnotation.targetClass()))
-						.toList());
+				return invokeWithExceptionHandling(setter, objectUnderConstruction, propertyListToTargetClass(objectMapper.convertValue(propertyList, PropertyListVO.class), setterAnnotation.targetClass()));
 			}
 			PropertyListVO propertyVOS = new PropertyListVO();
 			propertyVOS.add(propertyVO);
-			// in case of single element lists, they are returned as a flat property
 			return invokeWithExceptionHandling(setter, objectUnderConstruction, propertyListToTargetClass(propertyVOS, setterAnnotation.targetClass()));
+			// in case of single element lists, they are returned as a flat property
 		} else {
 			return Mono.error(new MappingException(String.format("The attribute is not a valid property list: %v ", propertyListObject)));
 		}
