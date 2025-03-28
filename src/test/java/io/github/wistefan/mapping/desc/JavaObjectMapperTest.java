@@ -3,39 +3,12 @@ package io.github.wistefan.mapping.desc;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.wistefan.mapping.MappingProperties;
-import io.github.wistefan.mapping.NgsiLdAttribute;
-import io.github.wistefan.mapping.QueryAttributeType;
-import io.github.wistefan.mapping.desc.pojos.MyMultiTypePojo;
-import io.github.wistefan.mapping.desc.pojos.MyPojo;
-import io.github.wistefan.mapping.desc.pojos.MyPojoWithListOfSubEntity;
-import io.github.wistefan.mapping.desc.pojos.MyPojoWithListOfSubProperty;
-import io.github.wistefan.mapping.desc.pojos.MyPojoWithSubEntity;
-import io.github.wistefan.mapping.desc.pojos.MyPojoWithSubEntityEmbed;
-import io.github.wistefan.mapping.desc.pojos.MyPojoWithSubProperty;
-import io.github.wistefan.mapping.desc.pojos.MySubProperty;
-import io.github.wistefan.mapping.desc.pojos.MySubPropertyEntity;
-import io.github.wistefan.mapping.desc.pojos.MySubPropertyEntityEmbed;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyInvalidListRelationshipPojo;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyInvalidRelationshipPojo;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithInvalidSubEntity;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithMultipleIds;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithMultipleTypes;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithPrivateId;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithPrivateType;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithWrongIdType;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithWrongTypeType;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithoutId;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithoutType;
-import io.github.wistefan.mapping.desc.pojos.invalid.MySubEntityWithNonURIDatasetId;
-import io.github.wistefan.mapping.desc.pojos.invalid.MySubEntityWithNonURIRelObject;
-import io.github.wistefan.mapping.desc.pojos.invalid.MySubEntityWithoutRelationshipObject;
-import io.github.wistefan.mapping.desc.pojos.invalid.MyThrowingPojo;
+import io.github.wistefan.mapping.*;
+import io.github.wistefan.mapping.desc.pojos.*;
+import io.github.wistefan.mapping.desc.pojos.invalid.*;
 import org.fiware.ngsi.model.AdditionalPropertyVO;
 import org.fiware.ngsi.model.EntityVO;
-import io.github.wistefan.mapping.AdditionalPropertyMixin;
-import io.github.wistefan.mapping.JavaObjectMapper;
-import io.github.wistefan.mapping.MappingException;
+import org.fiware.ngsi.model.PropertyListVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -46,12 +19,10 @@ import org.junit.jupiter.params.provider.MethodSource;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
+import static org.junit.jupiter.api.Assertions.*;
 
 class JavaObjectMapperTest {
 	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -60,7 +31,7 @@ class JavaObjectMapperTest {
 
 	@BeforeEach
 	public void setup() {
-		javaObjectMapper = new JavaObjectMapper(new MappingProperties());
+		javaObjectMapper = new JavaObjectMapper(new MappingProperties(), new ObjectMapper());
 		OBJECT_MAPPER.setSerializationInclusion(JsonInclude.Include.NON_NULL);
 		OBJECT_MAPPER
 				.addMixIn(AdditionalPropertyVO.class, AdditionalPropertyMixin.class);
@@ -87,8 +58,7 @@ class JavaObjectMapperTest {
 	@DisplayName("Map Pojo with a field that is an object.")
 	@Test
 	void testSubPropertyMapping() throws JsonProcessingException {
-		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"mySubProperty\":{\"value\":{\"propertyName\":\"My property\"},\"type\":\"Property\"}}";
-
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"mySubProperty\":{\"value\":{\"propertyName\":\"My property\"},\"type\":\"Property\",\"propertyName\":{\"value\":\"My property\",\"type\":\"Property\"}}}";
 		MyPojoWithSubProperty myComplexPojo = new MyPojoWithSubProperty("urn:ngsi-ld:complex-pojo:the-test-pojo");
 		MySubProperty mySubProperty = new MySubProperty();
 		mySubProperty.setPropertyName("My property");
@@ -101,8 +71,7 @@ class JavaObjectMapperTest {
 	@DisplayName("Map Pojo with a field that is a list of objects.")
 	@Test
 	void testListOfSubPropertyMapping() throws JsonProcessingException {
-		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"mySubProperty\":{\"value\":[{\"propertyName\":\"My property 1\"},{\"propertyName\":\"My property 2\"}],\"type\":\"Property\"}}";
-
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"mySubProperty\":[{\"value\":{\"propertyName\":\"My property 1\"},\"type\":\"Property\",\"propertyName\":{\"value\":\"My property 1\",\"type\":\"Property\"}},{\"value\":{\"propertyName\":\"My property 2\"},\"type\":\"Property\",\"propertyName\":{\"value\":\"My property 2\",\"type\":\"Property\"}}]}";
 		MyPojoWithListOfSubProperty myComplexPojo = new MyPojoWithListOfSubProperty(
 				"urn:ngsi-ld:complex-pojo:the-test-pojo");
 		MySubProperty mySubProperty1 = new MySubProperty();
@@ -111,7 +80,18 @@ class JavaObjectMapperTest {
 		mySubProperty2.setPropertyName("My property 2");
 		myComplexPojo.setMySubProperties(List.of(mySubProperty1, mySubProperty2));
 
-		assertEquals(expectedJson, OBJECT_MAPPER.writeValueAsString(javaObjectMapper.toEntityVO(myComplexPojo)),
+		EntityVO entityVO = javaObjectMapper.toEntityVO(myComplexPojo);
+		AdditionalPropertyVO additionalPropertyVO = entityVO.getAdditionalProperties().get("mySubProperty");
+		assertTrue(additionalPropertyVO instanceof PropertyListVO);
+
+		PropertyListVO plVO = (PropertyListVO) additionalPropertyVO;
+		plVO.forEach(pvo -> assertNotNull(pvo.getDatasetId(), "Each entry should have a datasetId"));
+
+		PropertyListVO cleanedPropertyVOS = new PropertyListVO();
+		plVO.stream().map(propertyVO -> propertyVO.datasetId(null)).forEach(cleanedPropertyVOS::add);
+
+		entityVO.getAdditionalProperties().put("mySubProperty", cleanedPropertyVOS);
+		assertEquals(expectedJson, OBJECT_MAPPER.writeValueAsString(entityVO),
 				"The pojo should have been translated into a valid entity");
 	}
 
@@ -327,6 +307,110 @@ class JavaObjectMapperTest {
 	void testGetNGSIAttributePath(Class<?> testClass, List<String> requestPath, NgsiLdAttribute expectedAttribute) {
 		assertEquals(expectedAttribute, JavaObjectMapper.getNGSIAttributePath(requestPath, testClass),
 				"The correct path mapping should have been returned.");
+	}
+
+	@DisplayName("Map entity with a simple unmapped property.")
+	@Test
+	void testWithUnmappedProperties() throws Exception {
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"test\":{\"value\":\"test\",\"type\":\"Property\"},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
+
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty("test", "test"));
+
+		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		myPojoWithUnmappedProperties.setMyName("my-name");
+		myPojoWithUnmappedProperties.setUnmappedProperties(unmappedProperties);
+
+		assertEquals(expectedJson,
+				OBJECT_MAPPER.writeValueAsString(javaObjectMapper.toEntityVO(myPojoWithUnmappedProperties)),
+				"The pojo should have been translated into a valid entity");
+	}
+
+	@DisplayName("Map entity with an unmapped property, containing a relationship.")
+	@Test
+	void testWithUnmappedRelationship() throws Exception {
+
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty("test", "test"));
+		unmappedProperties.add(new UnmappedProperty("complex", Map.of("something", "other", "id", "urn:ngsi-ld:entity:id")));
+
+		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		myPojoWithUnmappedProperties.setMyName("my-name");
+		myPojoWithUnmappedProperties.setUnmappedProperties(unmappedProperties);
+
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"test\":{\"value\":\"test\",\"type\":\"Property\"},\"complex\":{\"object\":\"urn:ngsi-ld:entity:id\",\"type\":\"Relationship\",\"something\":{\"value\":\"other\",\"type\":\"Property\"}},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
+
+		assertEquals(expectedJson,
+				OBJECT_MAPPER.writeValueAsString(javaObjectMapper.toEntityVO(myPojoWithUnmappedProperties)),
+				"The pojo should have been translated into a valid entity");
+	}
+
+	@DisplayName("Map entity with a complex unmapped property.")
+	@Test
+	void testWithComplexUnmappedProperties() throws Exception {
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"test\":{\"value\":\"test\",\"type\":\"Property\"},\"complex\":{\"value\":{\"number\":{\"value\":1,\"type\":\"Property\"},\"something\":{\"value\":\"something\",\"type\":\"Property\"}},\"type\":\"Property\",\"number\":{\"value\":1,\"type\":\"Property\"},\"something\":{\"value\":\"something\",\"type\":\"Property\"}},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty("test", "test"));
+		unmappedProperties.add(new UnmappedProperty("complex", Map.of("number", 1, "something", "something")));
+
+		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		myPojoWithUnmappedProperties.setMyName("my-name");
+		myPojoWithUnmappedProperties.setUnmappedProperties(unmappedProperties);
+
+		assertEquals(expectedJson,
+				OBJECT_MAPPER.writeValueAsString(javaObjectMapper.toEntityVO(myPojoWithUnmappedProperties)),
+				"The pojo should have been translated into a valid entity");
+	}
+
+	@DisplayName("Map entity with a deep unmapped property.")
+	@Test
+	void testWithDeepUnmappedProperties() throws Exception {
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"test\":{\"value\":\"test\",\"type\":\"Property\"},\"complex\":{\"value\":{\"number\":{\"value\":1,\"type\":\"Property\"},\"deep\":{\"value\":{\"something\":{\"value\":\"deep\",\"type\":\"Property\"}},\"type\":\"Property\",\"something\":{\"value\":\"deep\",\"type\":\"Property\"}}},\"type\":\"Property\",\"number\":{\"value\":1,\"type\":\"Property\"},\"deep\":{\"value\":{\"something\":{\"value\":\"deep\",\"type\":\"Property\"}},\"type\":\"Property\",\"something\":{\"value\":\"deep\",\"type\":\"Property\"}}},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty("test", "test"));
+		unmappedProperties.add(new UnmappedProperty("complex", Map.of("number", 1, "deep", Map.of("something", "deep"))));
+
+		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		myPojoWithUnmappedProperties.setMyName("my-name");
+		myPojoWithUnmappedProperties.setUnmappedProperties(unmappedProperties);
+
+		assertEquals(expectedJson,
+				OBJECT_MAPPER.writeValueAsString(javaObjectMapper.toEntityVO(myPojoWithUnmappedProperties)),
+				"The pojo should have been translated into a valid entity");
+	}
+
+	@DisplayName("Map entity with an unmapped property list.")
+	@Test
+	void testWithUnmappedPropertiesList() throws Exception {
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"test\":{\"value\":[1,2,3],\"type\":\"Property\"},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty("test", List.of(1, 2, 3)));
+
+		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		myPojoWithUnmappedProperties.setMyName("my-name");
+		myPojoWithUnmappedProperties.setUnmappedProperties(unmappedProperties);
+
+		assertEquals(expectedJson,
+				OBJECT_MAPPER.writeValueAsString(javaObjectMapper.toEntityVO(myPojoWithUnmappedProperties)),
+				"The pojo should have been translated into a valid entity");
+	}
+
+
+	@DisplayName("Map entity with multiple unmapped properties.")
+	@Test
+	void testWithMultipleUnmappedProperties() throws Exception {
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"other\":{\"value\":\"property\",\"type\":\"Property\"},\"test\":{\"value\":[1,2,3],\"type\":\"Property\"},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty("test", List.of(1, 2, 3)));
+		unmappedProperties.add(new UnmappedProperty("other", "property"));
+
+		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		myPojoWithUnmappedProperties.setMyName("my-name");
+		myPojoWithUnmappedProperties.setUnmappedProperties(unmappedProperties);
+
+		assertEquals(expectedJson,
+				OBJECT_MAPPER.writeValueAsString(javaObjectMapper.toEntityVO(myPojoWithUnmappedProperties)),
+				"The pojo should have been translated into a valid entity");
 	}
 
 	private static Stream<Arguments> getNGSIAttributePaths() {
