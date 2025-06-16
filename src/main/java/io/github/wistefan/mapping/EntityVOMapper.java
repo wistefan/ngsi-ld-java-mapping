@@ -360,9 +360,10 @@ public class EntityVOMapper extends Mapper {
 			PropertyListVO propertyVOS = new PropertyListVO();
 			Optional.ofNullable(propertyVO.getValue())
 					.map(pvo -> {
-						if (pvo instanceof PropertyVO pvoI) {
-							return pvoI;
-						} else {
+						try {
+							return objectMapper.convertValue(pvo, PropertyVO.class);
+						} catch (Exception e) {
+							log.debug("The value cant be converted to a PropertyVO.", e);
 							return propertyVO;
 						}
 					})
