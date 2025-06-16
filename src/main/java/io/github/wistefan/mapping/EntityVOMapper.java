@@ -358,7 +358,15 @@ public class EntityVOMapper extends Mapper {
 				return invokeWithExceptionHandling(setter, objectUnderConstruction, propertyListToTargetClass(objectMapper.convertValue(propertyList, PropertyListVO.class), setterAnnotation.targetClass()));
 			}
 			PropertyListVO propertyVOS = new PropertyListVO();
-			propertyVOS.add(objectMapper.convertValue(propertyVO.getValue(), PropertyVO.class));
+			Optional.ofNullable(propertyVO.getValue())
+					.map(pvo -> {
+						if (pvo instanceof PropertyVO pvoI) {
+							return pvoI;
+						} else {
+							return propertyVO;
+						}
+					})
+					.ifPresent(propertyVOS::add);
 			return invokeWithExceptionHandling(setter, objectUnderConstruction, propertyListToTargetClass(propertyVOS, setterAnnotation.targetClass()));
 			// in case of single element lists, they are returned as a flat property
 		} else {
