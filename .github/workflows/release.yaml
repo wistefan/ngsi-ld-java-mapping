@@ -76,8 +76,8 @@ jobs:
 
       - name: Build and release it
         env:
-          SERVER_USERNAME: ${{ secrets.SERVER_USERNAME }}
-          SERVER_PASSWORD: ${{ secrets.SERVER_PASSWORD }}
+          SONATYPE_ORG_USERNAME: ${{ secrets.SONATYPE_ORG_USERNAME }}
+          SONATYPE_ORG_PASSWORD: ${{ secrets.SONATYPE_ORG_PASSWORD }}
           GPG_PASSPHRASE: ${{ secrets.GPG_SECRET_KEY_PASSWORD }}
         run: |
           mvn install deploy -Prelease -Dgpg.keyname=563C5DE0C079D6AD

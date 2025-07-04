@@ -29,17 +29,13 @@
         <url>https://github.com/wistefan/ngsi-ld-java-mapping/tree/main</url>
         <tag>HEAD</tag>
     </scm>
+
+
     <distributionManagement>
         <snapshotRepository>
-            <id>sonatype-nexus</id>
-            <name>Sonatype Nexus Snapshots</name>
-            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+            <id>sonatype.org</id>
+            <url>https://central.sonatype.com/repository/maven-snapshots/</url>
         </snapshotRepository>
-        <repository>
-            <id>sonatype-nexus</id>
-            <name>Nexus Release Repository</name>
-            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2</url>
-        </repository>
     </distributionManagement>
 
     <properties>
@@ -100,6 +96,7 @@
         <version.org.apache.maven.plugins.maven-gpg-plugin>3.0.1</version.org.apache.maven.plugins.maven-gpg-plugin>
         <version.org.sonatype.plugins.nexus-staging-maven-plugin>1.6.13
         </version.org.sonatype.plugins.nexus-staging-maven-plugin>
+        <version.org.sonatype.central.publishing-plugin>0.8.0</version.org.sonatype.central.publishing-plugin>
 
         <!-- test -->
         <version.org.junit.jupiter>5.9.3</version.org.junit.jupiter>
@@ -496,14 +493,14 @@
             <build>
                 <plugins>
                     <plugin>
-                        <groupId>org.sonatype.plugins</groupId>
-                        <artifactId>nexus-staging-maven-plugin</artifactId>
-                        <version>${version.org.sonatype.plugins.nexus-staging-maven-plugin}</version>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>${version.org.sonatype.central.publishing-plugin}</version>
                         <extensions>true</extensions>
                         <configuration>
-                            <serverId>sonatype-nexus</serverId>
-                            <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-                            <autoReleaseAfterClose>true</autoReleaseAfterClose>
+                            <publishingServerId>sonatype.org</publishingServerId>
+                            <autoPublish>true</autoPublish>
+                            <waitUntil>published</waitUntil>
                         </configuration>
                     </plugin>
                     <plugin>
