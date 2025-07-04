@@ -287,21 +287,21 @@ public class JavaObjectMapper extends Mapper {
 	 * Check if the given method defines the entity type
 	 */
 	private boolean isEntityTypeMethod(Method method) {
-		return Arrays.stream(method.getAnnotations()).anyMatch(EntityType.class::isInstance);
+		return Arrays.stream(method.getAnnotations()).anyMatch(a -> a.annotationType() == EntityType.class);
 	}
 
 	/**
 	 * Check if the given method defines the entity id
 	 */
 	private boolean isEntityIdMethod(Method method) {
-		return Arrays.stream(method.getAnnotations()).anyMatch(EntityId.class::isInstance);
+		return Arrays.stream(method.getAnnotations()).anyMatch(a -> a.annotationType() == EntityId.class);
 	}
 
 	/**
 	 * Check if the given method handles access to the unmapped properties
 	 */
 	private boolean isUnmappedPropertiesGetter(Method method) {
-		return Arrays.stream(method.getAnnotations()).anyMatch(UnmappedPropertiesGetter.class::isInstance);
+		return Arrays.stream(method.getAnnotations()).anyMatch(a -> a.annotationType() == UnmappedPropertiesGetter.class);
 	}
 
 	/**
@@ -450,7 +450,7 @@ public class JavaObjectMapper extends Mapper {
 		if (o instanceof Instant) {
 			return true;
 		}
-		if(o instanceof Enum<?>) {
+		if (o instanceof Enum<?>) {
 			return true;
 		}
 
@@ -519,7 +519,7 @@ public class JavaObjectMapper extends Mapper {
 	 * return the {@link  AttributeGetter} annotation for the method if there is such.
 	 */
 	private Optional<AttributeGetter> getAttributeGetterAnnotation(Method m) {
-		return Arrays.stream(m.getAnnotations()).filter(AttributeGetter.class::isInstance).findFirst()
+		return Arrays.stream(m.getAnnotations()).filter(a -> a.annotationType() == AttributeGetter.class).findFirst()
 				.map(AttributeGetter.class::cast);
 	}
 
@@ -527,7 +527,7 @@ public class JavaObjectMapper extends Mapper {
 	 * Find the attribute getter from all the annotations.
 	 */
 	private static Optional<AttributeGetter> getAttributeGetter(Annotation[] annotations) {
-		return Arrays.stream(annotations).filter(AttributeGetter.class::isInstance).map(AttributeGetter.class::cast)
+		return Arrays.stream(annotations).filter(a -> a.annotationType() == AttributeGetter.class).map(AttributeGetter.class::cast)
 				.findFirst();
 	}
 
@@ -535,7 +535,7 @@ public class JavaObjectMapper extends Mapper {
 	 * Find the attribute setter from all the annotations.
 	 */
 	private static Optional<AttributeSetter> getAttributeSetter(Annotation[] annotations) {
-		return Arrays.stream(annotations).filter(AttributeSetter.class::isInstance).map(AttributeSetter.class::cast)
+		return Arrays.stream(annotations).filter(a -> a.annotationType() == AttributeSetter.class).map(AttributeSetter.class::cast)
 				.findFirst();
 	}
 
@@ -543,14 +543,14 @@ public class JavaObjectMapper extends Mapper {
 	 * Check if the given method is declared to be used as object of a relationship
 	 */
 	private boolean isRelationShipObject(Method m) {
-		return Arrays.stream(m.getAnnotations()).anyMatch(RelationshipObject.class::isInstance);
+		return Arrays.stream(m.getAnnotations()).anyMatch(a -> a.annotationType() == RelationshipObject.class);
 	}
 
 	/**
 	 * Check if the given method is declared to be used as datasetId
 	 */
 	private boolean isDatasetId(Method m) {
-		return Arrays.stream(m.getAnnotations()).anyMatch(DatasetId.class::isInstance);
+		return Arrays.stream(m.getAnnotations()).anyMatch(a -> a.annotationType() == DatasetId.class);
 	}
 
 	/**
@@ -593,7 +593,8 @@ public class JavaObjectMapper extends Mapper {
 		if (obj == null || obj instanceof Collection<?>) {
 			return Map.of();
 		}
-		return objectMapper.convertValue(obj, new TypeReference<Map<String, Object>>() {});
+		return objectMapper.convertValue(obj, new TypeReference<Map<String, Object>>() {
+		});
 	}
 
 	/**

@@ -15,7 +15,7 @@ public abstract class Mapper {
 	 */
 	protected static <T> Optional<MappingEnabled> isMappingEnabled(Class<T> tClass) {
 		return Arrays.stream(tClass.getAnnotations())
-				.filter(MappingEnabled.class::isInstance)
+				.filter(annotation -> annotation.annotationType() == MappingEnabled.class)
 				.map(MappingEnabled.class::cast)
 				.findFirst();
 	}

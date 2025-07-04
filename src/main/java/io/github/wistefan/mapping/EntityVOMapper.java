@@ -4,10 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
-import io.github.wistefan.mapping.annotations.AttributeSetter;
-import io.github.wistefan.mapping.annotations.AttributeType;
-import io.github.wistefan.mapping.annotations.MappingEnabled;
-import io.github.wistefan.mapping.annotations.UnmappedPropertiesSetter;
+import io.github.wistefan.mapping.annotations.*;
 import lombok.extern.slf4j.Slf4j;
 import org.fiware.ngsi.model.*;
 import reactor.core.publisher.Mono;
@@ -644,7 +641,7 @@ public class EntityVOMapper extends Mapper {
 	 * Check if the given method handles access to the unmapped properties
 	 */
 	private boolean isUnmappedPropertiesSetter(Method method) {
-		return Arrays.stream(method.getAnnotations()).anyMatch(UnmappedPropertiesSetter.class::isInstance);
+		return Arrays.stream(method.getAnnotations()).anyMatch(a -> a.annotationType() == UnmappedPropertiesSetter.class);
 	}
 
 	private boolean isRelationshipList(PropertyVO testProperty) {
@@ -766,7 +763,7 @@ public class EntityVOMapper extends Mapper {
 	 * Get the attribute setter annotation from the given method, if it exists.
 	 */
 	private Optional<AttributeSetter> getAttributeSetterAnnotation(Method m) {
-		return Arrays.stream(m.getAnnotations()).filter(AttributeSetter.class::isInstance)
+		return Arrays.stream(m.getAnnotations()).filter(a -> a.annotationType() == AttributeSetter.class)
 				.findFirst()
 				.map(AttributeSetter.class::cast);
 	}
