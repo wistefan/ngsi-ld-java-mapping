@@ -57,9 +57,9 @@ jobs:
           distribution: temurin
           java-version: 17
           cache: maven
-          server-id: sonatype-nexus
-          server-username: SERVER_USERNAME
-          server-password: SERVER_PASSWORD
+          server-id: sonatype.org
+          server-username: ${{ secrets.SONATYPE_ORG_USERNAME }}
+          server-password: ${{ secrets.SONATYPE_ORG_PASSWORD }}
           gpg-private-key: ${{ secrets.GPG_SECRET_KEY }}
           gpg-passphrase: GPG_PASSPHRASE
 
@@ -70,9 +70,6 @@ jobs:
       - name: Run tests
         run: |
           mvn clean test jacoco:report coveralls:report -Dcoveralls.token=${{ secrets.COVERALLS_TOKEN }}
-
-      - name: List keys
-        run: gpg -K
 
       - name: Build and release it
         env:
