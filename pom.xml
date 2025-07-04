@@ -453,7 +453,7 @@
                 </dependencies>
 
             </plugin>
-            <!-- add generated sources -->
+            <!-- add generated sources  -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>build-helper-maven-plugin</artifactId>
