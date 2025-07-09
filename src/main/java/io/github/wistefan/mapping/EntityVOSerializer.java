@@ -19,66 +19,64 @@ import java.util.Optional;
 @Bean
 public class EntityVOSerializer implements ObjectSerializer {
 
-    private final ObjectMapper objectMapper;
+	private final ObjectMapper objectMapper;
 
-    public EntityVOSerializer(CacheSerdeableObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
+	public EntityVOSerializer(CacheSerdeableObjectMapper objectMapper) {
+		this.objectMapper = objectMapper;
+	}
 
-    @Override
-    public Optional<byte[]> serialize(Object object) throws SerializationException {
-        try {
-            return Optional.ofNullable(objectMapper.writeValueAsBytes(object));
-        } catch (JsonProcessingException e) {
-            throw new SerializationException("Error serializing object to JSON: " + e.getMessage(), e);
-        }
-    }
+	@Override
+	public Optional<byte[]> serialize(Object object) throws SerializationException {
+		try {
+			return Optional.ofNullable(objectMapper.writeValueAsBytes(object));
+		} catch (JsonProcessingException e) {
+			throw new SerializationException("Error serializing object to JSON: " + e.getMessage(), e);
+		}
+	}
 
-    @Override
-    public void serialize(Object object, OutputStream outputStream) throws SerializationException {
-        try {
-            objectMapper.writeValue(outputStream, object);
-        } catch (IOException e) {
-            throw new SerializationException("Error serializing object to JSON: " + e.getMessage(), e);
-        }
-    }
+	@Override
+	public void serialize(Object object, OutputStream outputStream) throws SerializationException {
+		try {
+			objectMapper.writeValue(outputStream, object);
+		} catch (IOException e) {
+			throw new SerializationException("Error serializing object to JSON: " + e.getMessage(), e);
+		}
+	}
 
-    @Override
-    public <T> Optional<T> deserialize(byte[] bytes, Class<T> requiredType) throws SerializationException {
-        try {
-            return Optional.ofNullable(objectMapper.readValue(bytes, requiredType));
-        } catch (IOException e) {
-            throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
-        }
-    }
+	@Override
+	public <T> Optional<T> deserialize(byte[] bytes, Class<T> requiredType) throws SerializationException {
+		try {
+			return Optional.ofNullable(objectMapper.readValue(bytes, requiredType));
+		} catch (IOException e) {
+			throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
+		}
+	}
 
-    @Override
-    public <T> Optional<T> deserialize(InputStream inputStream, Class<T> requiredType) throws SerializationException {
-        try {
-            return Optional.ofNullable(objectMapper.readValue(inputStream, requiredType));
-        } catch (IOException e) {
-            throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
-        }
-    }
+	@Override
+	public <T> Optional<T> deserialize(InputStream inputStream, Class<T> requiredType) throws SerializationException {
+		try {
+			return Optional.ofNullable(objectMapper.readValue(inputStream, requiredType));
+		} catch (IOException e) {
+			throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
+		}
+	}
 
-    @Override
-    public <T> Optional<T> deserialize(byte[] bytes, Argument<T> requiredType) throws SerializationException {
-        try {
-            JavaType javaType = JacksonConfiguration.constructType(requiredType, objectMapper.getTypeFactory());
-            return Optional.ofNullable(objectMapper.readValue(bytes, javaType));
-        } catch (Exception e) {
-            throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
-        }
-    }
+	@Override
+	public <T> Optional<T> deserialize(byte[] bytes, Argument<T> requiredType) throws SerializationException {
+		try {
+			return Optional.ofNullable(objectMapper.readValue(bytes, requiredType.getType()));
+		} catch (Exception e) {
+			throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
+		}
+	}
 
-    @Override
-    public <T> Optional<T> deserialize(InputStream inputStream, Argument<T> requiredType) throws SerializationException {
-        try {
-            JavaType javaType = JacksonConfiguration.constructType(requiredType, objectMapper.getTypeFactory());
-            return Optional.ofNullable(objectMapper.readValue(inputStream, javaType));
-        } catch (IOException e) {
-            throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
-        }
-    }
+	@Override
+	public <T> Optional<T> deserialize(InputStream inputStream, Argument<T> requiredType) throws SerializationException {
+		try {
+			return Optional.ofNullable(objectMapper.readValue(inputStream, requiredType.getType()));
+		} catch (IOException e) {
+			throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
+		}
+	}
 }
 
