@@ -304,6 +304,12 @@ public class EntityVOMapper extends Mapper {
 							return fromProperty(entry.getKey(), pvo);
 						} else if (entry.getValue() instanceof RelationshipVO rvo) {
 							return fromRelationship(entry.getKey(), rvo);
+						} else if (entry.getValue() instanceof PropertyListVO plvo) {
+							List<Object> valueList = plvo.stream()
+									.map(pvo -> fromProperty(entry.getKey(), pvo))
+									.map(Map.Entry::getValue)
+									.toList();
+							return new AbstractMap.SimpleEntry<>(key, valueList);
 						} else {
 							throw new MappingException(String.format("Entry value is not supported. Was: %s", entry.getValue()));
 						}
