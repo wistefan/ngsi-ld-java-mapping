@@ -1,5 +1,6 @@
 package io.github.wistefan.mapping;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.wistefan.mapping.annotations.*;
@@ -262,6 +263,7 @@ public class JavaObjectMapper extends Mapper {
 		additionalProperties.putAll(buildPropertyList(entity, propertyListMethods));
 		additionalProperties.putAll(buildGeoProperties(entity, geoPropertyMethods));
 		if (unmappedPropertiesMethod.isPresent()) {
+			log.info("Is present");
 			additionalProperties.putAll(buildUnmappedProperties(entity, unmappedPropertiesMethod.get()));
 		}
 		Map<String, RelationshipVO> relationshipVOMap = buildRelationships(entity, relationshipMethods);
@@ -351,7 +353,7 @@ public class JavaObjectMapper extends Mapper {
 
 	private Map.Entry<String, AdditionalPropertyVO> unmappedPropertyToAdditionalProperty(UnmappedProperty unmappedProperty) {
 		AdditionalPropertyVO additionalPropertyVO = objectToAdditionalProperty(unmappedProperty.getValue());
-		return new AbstractMap.SimpleEntry<>(unmappedProperty.getName(), additionalPropertyVO);
+		return new AbstractMap.SimpleEntry<>(ReservedWordHandler.escapeReservedWords(unmappedProperty.getName()), additionalPropertyVO);
 
 	}
 
@@ -367,6 +369,7 @@ public class JavaObjectMapper extends Mapper {
 				if (name.equals(ID_PROPERTY)) {
 					return;
 				}
+				name = ReservedWordHandler.escapeReservedWords(name);
 				relationshipVO.setAdditionalProperties(name, objectToAdditionalProperty(value));
 			} else {
 				throw new MappingException(String.format("Only string keys are supported, but was %s", key));
@@ -423,6 +426,7 @@ public class JavaObjectMapper extends Mapper {
 				Map<String, AdditionalPropertyVO> values = new HashMap<>();
 				objectMap.forEach((key, value) -> {
 					if (key instanceof String name) {
+						name = ReservedWordHandler.escapeReservedWords(name);
 						propertyVO.setAdditionalProperties(name, objectToAdditionalProperty(value));
 						values.put(name, objectToAdditionalProperty(value));
 					} else {
@@ -456,6 +460,8 @@ public class JavaObjectMapper extends Mapper {
 
 		return false;
 	}
+
+
 
 	private <T> Map<String, AdditionalPropertyVO> buildUnmappedProperties(T entity, Method method) {
 		try {

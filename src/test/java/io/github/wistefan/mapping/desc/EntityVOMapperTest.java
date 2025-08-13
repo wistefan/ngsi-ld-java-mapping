@@ -99,6 +99,22 @@ class EntityVOMapperTest {
 		assertEquals(expectedPojo, myPojoWithUnmappedProperties, "The full pojo should be returned.");
 	}
 
+	@DisplayName("Map an entity with a not explicitly mapped property list containing a reserved word.")
+	@Test
+	void testWithUnmappedPropertiesListContainingReservedWord() throws Exception {
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty("@value", List.of(1, 2, 3)));
+
+		MyPojoWithUnmappedProperties expectedPojo = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		expectedPojo.setMyName("my-name");
+		expectedPojo.setUnmappedProperties(unmappedProperties);
+
+		String entityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"tmfEscaped-@value\":{\"value\":[1,2,3],\"type\":\"Property\"},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = entityVOMapper.fromEntityVO(theEntity, MyPojoWithUnmappedProperties.class).block();
+		assertEquals(expectedPojo, myPojoWithUnmappedProperties, "The full pojo should be returned.");
+	}
 	@DisplayName("Map an entity with multiple not explicitly mapped properties.")
 	@Test
 	void testWithMultipleUnmappedProperties() throws Exception {

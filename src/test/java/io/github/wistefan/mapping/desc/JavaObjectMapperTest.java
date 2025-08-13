@@ -326,6 +326,23 @@ class JavaObjectMapperTest {
 				"The pojo should have been translated into a valid entity");
 	}
 
+	@DisplayName("Map entity with a simple unmapped property containing a reserved work.")
+	@Test
+	void testWithUnmappedPropertiesReservedWord() throws Exception {
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"tmfEscaped-@id\":{\"value\":\"test\",\"type\":\"Property\"},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
+
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty("@id", "test"));
+
+		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		myPojoWithUnmappedProperties.setMyName("my-name");
+		myPojoWithUnmappedProperties.setUnmappedProperties(unmappedProperties);
+
+		assertEquals(expectedJson,
+				OBJECT_MAPPER.writeValueAsString(javaObjectMapper.toEntityVO(myPojoWithUnmappedProperties)),
+				"The pojo should have been translated into a valid entity");
+	}
+
 	@DisplayName("Map entity with an unmapped property, containing a relationship.")
 	@Test
 	void testWithUnmappedRelationship() throws Exception {
