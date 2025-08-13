@@ -1,10 +1,14 @@
 package io.github.wistefan.mapping;
 
+import lombok.extern.log4j.Log4j;
+import lombok.extern.slf4j.Slf4j;
+
 import java.util.List;
 
 /**
  * Handler for reserved words in NGSI-LD
  */
+@Slf4j
 public class ReservedWordHandler {
 
 	/**
@@ -20,36 +24,39 @@ public class ReservedWordHandler {
 	/**
 	 * Escape reserved words in keys.
 	 *
-	 * @param unmappedProperty the property to escape
-	 * @return the escaped property
+	 * @param key the key to escape
+	 * @return the escaped key
 	 */
-	public static UnmappedProperty escapeReservedWords(UnmappedProperty unmappedProperty) {
-		if (RESERVED_WORDS.contains(unmappedProperty.getName())) {
-			unmappedProperty.setName(String.format("%s%s", ESCAPE_PREFIX, unmappedProperty.getName()));
+	public static String escapeReservedWords(String key) {
+		log.info("Check the word {}", key);
+		if (RESERVED_WORDS.contains(key)) {
+			return String.format("%s%s", ESCAPE_PREFIX, key);
 		}
-		return unmappedProperty;
+		return key;
 	}
 
 	/**
-	 * Check if the unmapped property is an reserved word property
+	 * Check if the key is an reserved word
 	 *
-	 * @param unmappedProperty the property to check
+	 * @param key the key to check
 	 * @return true if the key is a reserved word
 	 */
-	public static boolean isReservedProperty(UnmappedProperty unmappedProperty) {
-		return unmappedProperty.getName().startsWith(ESCAPE_PREFIX);
+	public static boolean isReservedProperty(String key) {
+		log.info("Check the word {}", key);
+		return key.startsWith(ESCAPE_PREFIX);
 	}
 
 	/**
-	 * Removes the escape prefix from the property
+	 * Removes the escape prefix from the key
 	 *
-	 * @param unmappedProperty the property to clean
-	 * @return the cleaned property
+	 * @param key the key to clean
+	 * @return the cleaned key
 	 */
-	public static UnmappedProperty removeEscape(UnmappedProperty unmappedProperty) {
-		if (isReservedProperty(unmappedProperty)) {
-			unmappedProperty.setName(unmappedProperty.getName().replaceFirst(ESCAPE_PREFIX, ""));
+	public static String removeEscape(String key) {
+		log.info("Check the word {}", key);
+		if (isReservedProperty(key)) {
+			return key.replaceFirst(ESCAPE_PREFIX, "");
 		}
-		return unmappedProperty;
+		return key;
 	}
 }

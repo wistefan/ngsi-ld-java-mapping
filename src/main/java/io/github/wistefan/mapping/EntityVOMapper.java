@@ -243,14 +243,14 @@ public class EntityVOMapper extends Mapper {
 		return unmappedAdditionalProperties
 				.stream()
 				.map(this::toUnmappedProperty)
-				.map(ReservedWordHandler::removeEscape)
 				.toList();
 
 	}
 
 	private UnmappedProperty toUnmappedProperty(Map.Entry<String, AdditionalPropertyVO> unmappedAdditionalProperty) {
 		UnmappedProperty unmappedProperty = new UnmappedProperty();
-		unmappedProperty.setName(unmappedAdditionalProperty.getKey());
+		String name = ReservedWordHandler.removeEscape(unmappedAdditionalProperty.getKey());
+		unmappedProperty.setName(name);
 
 		if (unmappedAdditionalProperty.getValue() instanceof PropertyListVO propertyListVO) {
 			unmappedProperty.setValue(
@@ -289,11 +289,11 @@ public class EntityVOMapper extends Mapper {
 					.filter(entry -> entry.getValue() != null)
 					.toList());
 			entryList.add(new AbstractMap.SimpleEntry<>("id", idValue.toString()));
-			return new AbstractMap.SimpleEntry<>(key, entryList.stream()
+			return new AbstractMap.SimpleEntry<>(ReservedWordHandler.removeEscape(key), entryList.stream()
 					.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
 		} else {
 
-			return new AbstractMap.SimpleEntry<>(key, Map.of("id", idValue.toString()));
+			return new AbstractMap.SimpleEntry<>(ReservedWordHandler.removeEscape(key), Map.of("id", idValue.toString()));
 		}
 	}
 
@@ -311,7 +311,7 @@ public class EntityVOMapper extends Mapper {
 									.map(pvo -> fromProperty(entry.getKey(), pvo))
 									.map(Map.Entry::getValue)
 									.toList();
-							return new AbstractMap.SimpleEntry<>(key, valueList);
+							return new AbstractMap.SimpleEntry<>(ReservedWordHandler.removeEscape(key), valueList);
 						} else {
 							throw new MappingException(String.format("Entry value is not supported. Was: %s", entry.getValue()));
 						}
@@ -319,7 +319,7 @@ public class EntityVOMapper extends Mapper {
 					.filter(entry -> entry.getValue() != null)
 					.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
 		} else {
-			return new AbstractMap.SimpleEntry<>(key, propertyVO.getValue());
+			return new AbstractMap.SimpleEntry<>(ReservedWordHandler.removeEscape(key), propertyVO.getValue());
 		}
 	}
 
