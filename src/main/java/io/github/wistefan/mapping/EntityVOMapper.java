@@ -10,6 +10,7 @@ import org.fiware.ngsi.model.*;
 import reactor.core.publisher.Mono;
 
 import javax.inject.Singleton;
+import javax.swing.undo.UndoManager;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -242,6 +243,7 @@ public class EntityVOMapper extends Mapper {
 		return unmappedAdditionalProperties
 				.stream()
 				.map(this::toUnmappedProperty)
+				.map(ReservedWordHandler::removeEscape)
 				.toList();
 
 	}

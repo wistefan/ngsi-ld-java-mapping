@@ -457,6 +457,8 @@ public class JavaObjectMapper extends Mapper {
 		return false;
 	}
 
+
+
 	private <T> Map<String, AdditionalPropertyVO> buildUnmappedProperties(T entity, Method method) {
 		try {
 			Object unmappedProperties = method.invoke(entity);
@@ -467,6 +469,7 @@ public class JavaObjectMapper extends Mapper {
 						.stream()
 						.filter(UnmappedProperty.class::isInstance)
 						.map(UnmappedProperty.class::cast)
+						.map(ReservedWordHandler::escapeReservedWords)
 						.toList();
 				return theList.stream()
 						.map(this::unmappedPropertyToAdditionalProperty)
