@@ -14,7 +14,7 @@ public class ReservedWordHandler {
 	/**
 	 * Words that have a special meaning in NGSI-LD and are not allowed to be used in non-compliant ways.
 	 */
-	private static final List<String> RESERVED_WORDS = List.of("id", "@id", "value", "@value", "type", "@type");
+	private static final List<String> RESERVED_WORDS = List.of("id", "@id", "value", "@value", "type", "@type", "context", "@context");
 
 	/**
 	 * Prefix to be used for escaping the reserved words.
