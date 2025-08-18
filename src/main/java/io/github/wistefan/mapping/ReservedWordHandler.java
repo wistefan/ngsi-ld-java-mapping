@@ -1,9 +1,16 @@
 package io.github.wistefan.mapping;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.log4j.Log4j;
 import lombok.extern.slf4j.Slf4j;
 
+import java.net.URI;
+import java.time.Instant;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Handler for reserved words in NGSI-LD
@@ -42,7 +49,6 @@ public class ReservedWordHandler {
 	 * @return true if the key is a reserved word
 	 */
 	public static boolean isReservedProperty(String key) {
-		log.info("Check the word {}", key);
 		return key.startsWith(ESCAPE_PREFIX);
 	}
 
@@ -53,10 +59,13 @@ public class ReservedWordHandler {
 	 * @return the cleaned key
 	 */
 	public static String removeEscape(String key) {
-		log.info("Check the word {}", key);
 		if (isReservedProperty(key)) {
-			return key.replaceFirst(ESCAPE_PREFIX, "");
+			log.info("Deescape the word {}", key);
+			var w = key.replaceFirst(ESCAPE_PREFIX, "");
+			log.info("Done {}", w);
+			return w;
 		}
 		return key;
 	}
+
 }
