@@ -378,6 +378,9 @@ public class JavaObjectMapper extends Mapper {
 	}
 
 	private List<?> listToEscapedMap(List<?> objectList) {
+		if (objectList == null || objectList.isEmpty()) {
+			return objectList;
+		}
 		if (isPlain(objectList.get(0))) {
 			return objectList;
 		}
