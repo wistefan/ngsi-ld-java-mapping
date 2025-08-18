@@ -263,7 +263,6 @@ public class JavaObjectMapper extends Mapper {
 		additionalProperties.putAll(buildPropertyList(entity, propertyListMethods));
 		additionalProperties.putAll(buildGeoProperties(entity, geoPropertyMethods));
 		if (unmappedPropertiesMethod.isPresent()) {
-			log.info("Is present");
 			additionalProperties.putAll(buildUnmappedProperties(entity, unmappedPropertiesMethod.get()));
 		}
 		Map<String, RelationshipVO> relationshipVOMap = buildRelationships(entity, relationshipMethods);
@@ -378,10 +377,36 @@ public class JavaObjectMapper extends Mapper {
 		return relationshipVO;
 	}
 
+	private List<?> listToEscapedMap(List<?> objectList) {
+		if (isPlain(objectList.get(0))) {
+			return objectList;
+		}
+		return objectList.stream()
+				.map(this::toEscapedMap)
+				.toList();
+	}
+
+	private Map<String, Object> toEscapedMap(Object o) {
+		Map<String, Object> escapedMap = new HashMap<>();
+		Map<String, Object> unescapedMap = toMap(o);
+		unescapedMap.entrySet().forEach(entry -> {
+			String escapedKey = ReservedWordHandler.escapeReservedWords(entry.getKey());
+			if (entry.getValue() instanceof List valueList) {
+				escapedMap.put(escapedKey, listToEscapedMap(valueList));
+			} else if (isPlain(entry.getValue())) {
+				escapedMap.put(escapedKey, entry.getValue());
+			} else {
+				escapedMap.put(escapedKey, toEscapedMap(entry.getValue()));
+			}
+		});
+		return escapedMap;
+	}
+
+
 	private AdditionalPropertyVO objectToAdditionalProperty(Object o) {
 		if (o instanceof List<?> objectList && !objectList.isEmpty()) {
 			if (isPlain(objectList.get(0))) {
-				return new PropertyVO().value(objectList);
+				return new PropertyVO().value(listToEscapedMap(objectList));
 			} else {
 				PropertyListVO propertyVOS = new PropertyListVO();
 				RelationshipListVO relationshipVOS = new RelationshipListVO();
@@ -418,23 +443,16 @@ public class JavaObjectMapper extends Mapper {
 				objectMap = toMap(o);
 			}
 
-			if (objectMap.containsKey(ID_PROPERTY)) {
-				// contains key "id" -> relationship
-				return mapToRelationship(objectMap);
-			} else {
-				PropertyVO propertyVO = new PropertyVO();
-				Map<String, AdditionalPropertyVO> values = new HashMap<>();
-				objectMap.forEach((key, value) -> {
-					if (key instanceof String name) {
-						name = ReservedWordHandler.escapeReservedWords(name);
-						propertyVO.setAdditionalProperties(name, objectToAdditionalProperty(value));
-						values.put(name, objectToAdditionalProperty(value));
-					} else {
-						throw new MappingException(String.format("Only string keys are supported, but was %s", key));
-					}
-				});
-				return propertyVO.value(values);
-			}
+			PropertyVO propertyVO = new PropertyVO();
+			Map<String, AdditionalPropertyVO> values = new HashMap<>();
+			objectMap.forEach((key, value) -> {
+				if (key instanceof String stringKey) {
+					propertyVO.setAdditionalProperties(ReservedWordHandler.escapeReservedWords(stringKey), objectToAdditionalProperty(value));
+				}
+
+			});
+			return propertyVO.value(toEscapedMap(objectMap));
+
 		}
 	}
 
@@ -460,7 +478,6 @@ public class JavaObjectMapper extends Mapper {
 
 		return false;
 	}
-
 
 
 	private <T> Map<String, AdditionalPropertyVO> buildUnmappedProperties(T entity, Method method) {
@@ -573,7 +590,7 @@ public class JavaObjectMapper extends Mapper {
 
 			if (isPlain(propertyObject)) {
 				PropertyVO propertyVO = new PropertyVO();
-				propertyVO.setValue(propertyObject);
+				propertyVO.value(propertyObject);
 				return Optional.of(new AbstractMap.SimpleEntry<>(attributeMapping.targetName(), propertyVO));
 			} else if (propertyObject instanceof List) {
 				AdditionalPropertyVO additionalProperty = objectToAdditionalProperty(propertyObject);
@@ -585,7 +602,7 @@ public class JavaObjectMapper extends Mapper {
 				}
 				AdditionalPropertyVO additionalProperty = objectToAdditionalProperty(toMap(propertyObject));
 				if (additionalProperty instanceof PropertyVO) {
-					((PropertyVO) additionalProperty).setValue(propertyObject);
+					((PropertyVO) additionalProperty).value(toEscapedMap(propertyObject));
 				}
 				return Optional.of(new AbstractMap.SimpleEntry<>(attributeMapping.targetName(), additionalProperty));
 			}
@@ -753,7 +770,7 @@ public class JavaObjectMapper extends Mapper {
 					.map(propertyObject -> {
 						PropertyVO propertyVO = new PropertyVO();
 						if (isPlain(propertyObject)) {
-							propertyVO.setValue(propertyObject);
+							propertyVO.value(propertyObject);
 						} else {
 							Map<String, Object> propertyObjectMap = toMap(propertyObject);
 							if (propertyObjectMap.isEmpty()) {
@@ -761,7 +778,7 @@ public class JavaObjectMapper extends Mapper {
 							}
 							AdditionalPropertyVO additionalProperty = objectToAdditionalProperty(propertyObjectMap);
 							if (additionalProperty instanceof PropertyVO pvo) {
-								propertyVO = pvo.value(propertyObject);
+								propertyVO = pvo.value(toEscapedMap(propertyObject));
 							}
 						}
 						return propertyVO;

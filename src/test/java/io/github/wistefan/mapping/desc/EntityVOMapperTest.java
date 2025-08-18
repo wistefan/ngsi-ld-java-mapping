@@ -1,7 +1,12 @@
 package io.github.wistefan.mapping.desc;
 
+import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.deser.BeanDeserializerBuilder;
+import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
+import com.fasterxml.jackson.databind.deser.SettableBeanProperty;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import io.github.wistefan.mapping.*;
 import io.github.wistefan.mapping.desc.pojos.*;
 import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithSubEntityWellKnown;
@@ -20,6 +25,7 @@ import reactor.core.publisher.Mono;
 import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -30,7 +36,7 @@ import static org.mockito.Mockito.when;
 
 class EntityVOMapperTest {
 
-	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new EscapeCleaningJsonFactory());
 
 	private EntityVOMapper entityVOMapper;
 	private EntitiesRepository entitiesRepository = mock(EntitiesRepository.class);
@@ -39,6 +45,7 @@ class EntityVOMapperTest {
 
 	@BeforeEach
 	public void setup() {
+
 		mappingProperties = new MappingProperties();
 		entityVOMapper = new EntityVOMapper(mappingProperties, OBJECT_MAPPER, entitiesRepository);
 		OBJECT_MAPPER
@@ -115,6 +122,7 @@ class EntityVOMapperTest {
 		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = entityVOMapper.fromEntityVO(theEntity, MyPojoWithUnmappedProperties.class).block();
 		assertEquals(expectedPojo, myPojoWithUnmappedProperties, "The full pojo should be returned.");
 	}
+
 	@DisplayName("Map an entity with multiple not explicitly mapped properties.")
 	@Test
 	void testWithMultipleUnmappedProperties() throws Exception {
@@ -219,9 +227,6 @@ class EntityVOMapperTest {
 		MyPojoWithListOfSubProperty myPojoWithListOfSubProperty = entityVOMapper.fromEntityVO(theEntity, MyPojoWithListOfSubProperty.class).block();
 		assertEquals(expectedPojo, myPojoWithListOfSubProperty, "The full pojo should be returned.");
 	}
-
-
-
 
 
 	@DisplayName("Map entity containing a relationship that could not be resolved with strict-mapping disabled.")
