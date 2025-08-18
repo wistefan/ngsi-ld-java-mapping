@@ -35,7 +35,6 @@ public class ReservedWordHandler {
 	 * @return the escaped key
 	 */
 	public static String escapeReservedWords(String key) {
-		log.info("Check the word {}", key);
 		if (RESERVED_WORDS.contains(key)) {
 			return String.format("%s%s", ESCAPE_PREFIX, key);
 		}
@@ -60,7 +59,6 @@ public class ReservedWordHandler {
 	 */
 	public static String removeEscape(String key) {
 		if (isReservedProperty(key)) {
-			log.info("Deescape the word {}", key);
 			var w = key.replaceFirst(ESCAPE_PREFIX, "");
 			log.info("Done {}", w);
 			return w;
