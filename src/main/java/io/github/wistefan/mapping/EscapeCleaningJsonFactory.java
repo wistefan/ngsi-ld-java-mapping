@@ -2,6 +2,7 @@ package io.github.wistefan.mapping;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.ObjectCodec;
 import io.micronaut.context.annotation.Primary;
 import jakarta.inject.Singleton;
 
@@ -16,9 +17,11 @@ public class EscapeCleaningJsonFactory extends JsonFactory {
 
 	private final JsonFactory delegate = new JsonFactory();
 
-	public EscapeCleaningJsonFactory() {
-		// Copy config from the default if needed (modules are applied later via ObjectMapper)
-		this.setCodec(delegate.getCodec());
+	@Override
+	public JsonFactory setCodec(ObjectCodec oc) {
+		super.setCodec(oc);
+		delegate.setCodec(oc);
+		return this;
 	}
 
 	@Override
