@@ -407,6 +407,8 @@ public class EntityVOMapper extends Mapper {
 						.flatMap(relationshipList -> invokeWithExceptionHandling(setter, objectUnderConstruction, relationshipList));
 			} else if (attributeValue instanceof PropertyVO pvo && pvo.getValue() instanceof List<?> vl && vl.isEmpty()) {
 				return Mono.just(objectUnderConstruction);
+			} else if (optionalRelationshipListVO.isEmpty() && optionalRelationshipVO.isEmpty()) {
+				return Mono.just(objectUnderConstruction);
 			} else {
 				return Mono.error(new MappingException(String.format("Value of the relationship %s is invalid.", attributeValue)));
 			}
