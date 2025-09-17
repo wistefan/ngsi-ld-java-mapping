@@ -695,11 +695,12 @@ public class JavaObjectMapper extends Mapper {
 	private RelationshipVO getRelationshipVO(Method method, Object relationShipObject) {
 		try {
 
+
 			Method objectMethod = getRelationshipObjectMethod(relationShipObject).orElseThrow(
 					() -> new MappingException(
 							String.format("The relationship %s-%s does not provide an object method.",
 									relationShipObject, method)));
-			Object objectObject = objectMethod.invoke(relationShipObject);
+			Object objectObject = objectMethod.invoke(objectMethod.getDeclaringClass().cast(relationShipObject));
 			if (!(objectObject instanceof URI)) {
 				throw new MappingException(
 						String.format("The object %s of the relationship is not a URI.", relationShipObject));
@@ -708,7 +709,7 @@ public class JavaObjectMapper extends Mapper {
 			Method datasetIdMethod = getDatasetIdMethod(relationShipObject).orElseThrow(() -> new MappingException(
 					String.format("The relationship %s-%s does not provide a datasetId method.", relationShipObject,
 							method)));
-			Object datasetIdObject = datasetIdMethod.invoke(relationShipObject);
+			Object datasetIdObject = datasetIdMethod.invoke(datasetIdMethod.getDeclaringClass().cast(relationShipObject));
 			if (!(datasetIdObject instanceof URI)) {
 				throw new MappingException(
 						String.format("The datasetId %s of the relationship is not a URI.", relationShipObject));
@@ -764,6 +765,7 @@ public class JavaObjectMapper extends Mapper {
 				throw new MappingException(
 						String.format("Property list method %s::%s did not return a List.", entity, method));
 			}
+
 			AttributeGetter attributeMapping = getAttributeGetter(method.getAnnotations()).orElseThrow(
 					() -> new MappingException(String.format(NO_MAPPING_DEFINED_FOR_METHOD_TEMPLATE, method)));
 			List<Object> entityObjects = (List) o;
