@@ -402,7 +402,12 @@ class JavaObjectMapperTest {
 	@DisplayName("Map entity with an unmapped property list.")
 	@Test
 	void testWithUnmappedPropertiesList() throws Exception {
-		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"name\":{\"value\":\"my-name\",\"type\":\"Property\"},\"test\":{\"value\":[1,2,3],\"type\":\"Property\"}}";
+		// Plain lists are emitted as a multi-instance Property (PropertyListVO),
+		// one PropertyVO per item with a synthetic datasetId. This forces NGSI-LD
+		// brokers to preserve the array shape across JSON-LD compaction — the
+		// older form (Property carrying a JSON array as `value`) was vulnerable
+		// to single-element arrays being scalarised on retrieval.
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"name\":{\"value\":\"my-name\",\"type\":\"Property\"},\"test\":[{\"value\":1,\"datasetId\":\"urn:ngsi-ld:dataset:list-item:0\",\"type\":\"Property\"},{\"value\":2,\"datasetId\":\"urn:ngsi-ld:dataset:list-item:1\",\"type\":\"Property\"},{\"value\":3,\"datasetId\":\"urn:ngsi-ld:dataset:list-item:2\",\"type\":\"Property\"}]}";
 		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
 		unmappedProperties.add(new UnmappedProperty("test", List.of(1, 2, 3)));
 
@@ -419,7 +424,7 @@ class JavaObjectMapperTest {
 	@DisplayName("Map entity with multiple unmapped properties.")
 	@Test
 	void testWithMultipleUnmappedProperties() throws Exception {
-		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"name\":{\"value\":\"my-name\",\"type\":\"Property\"},\"other\":{\"value\":\"property\",\"type\":\"Property\"},\"test\":{\"value\":[1,2,3],\"type\":\"Property\"}}";
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"name\":{\"value\":\"my-name\",\"type\":\"Property\"},\"other\":{\"value\":\"property\",\"type\":\"Property\"},\"test\":[{\"value\":1,\"datasetId\":\"urn:ngsi-ld:dataset:list-item:0\",\"type\":\"Property\"},{\"value\":2,\"datasetId\":\"urn:ngsi-ld:dataset:list-item:1\",\"type\":\"Property\"},{\"value\":3,\"datasetId\":\"urn:ngsi-ld:dataset:list-item:2\",\"type\":\"Property\"}]}";
 		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
 		unmappedProperties.add(new UnmappedProperty("test", List.of(1, 2, 3)));
 		unmappedProperties.add(new UnmappedProperty("other", "property"));

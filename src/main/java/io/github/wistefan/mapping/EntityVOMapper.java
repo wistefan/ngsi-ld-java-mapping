@@ -249,7 +249,7 @@ public class EntityVOMapper extends Mapper {
 
 	private UnmappedProperty toUnmappedProperty(Map.Entry<String, AdditionalPropertyVO> unmappedAdditionalProperty) {
 		UnmappedProperty unmappedProperty = new UnmappedProperty();
-		unmappedProperty.setName(unmappedAdditionalProperty.getKey());
+		unmappedProperty.setName(ReservedWordHandler.removeEscape(unmappedAdditionalProperty.getKey()));
 
 		if (unmappedAdditionalProperty.getValue() instanceof PropertyListVO propertyListVO) {
 			unmappedProperty.setValue(
@@ -278,9 +278,9 @@ public class EntityVOMapper extends Mapper {
 					.stream()
 					.map(entry -> {
 						if (entry.getValue() instanceof PropertyVO pvo) {
-							return fromProperty(entry.getKey(), pvo);
+							return fromProperty(ReservedWordHandler.removeEscape(entry.getKey()), pvo);
 						} else if (entry.getValue() instanceof RelationshipVO rvo) {
-							return fromRelationship(entry.getKey(), rvo);
+							return fromRelationship(ReservedWordHandler.removeEscape(entry.getKey()), rvo);
 						} else {
 							throw new MappingException(String.format("Entry value is not supported. Was: %s", entry.getValue()));
 						}
@@ -296,21 +296,37 @@ public class EntityVOMapper extends Mapper {
 		}
 	}
 
+	/**
+	 * NGSI-LD brokers are allowed to compact a multi-instance Property that
+	 * happens to have only one instance back to a single Property in the
+	 * response (the array wrapper is dropped). When {@link JavaObjectMapper}
+	 * persists a plain-value list it tags every {@code PropertyVO} with a
+	 * synthetic {@code datasetId} prefixed by
+	 * {@link JavaObjectMapper#LIST_ITEM_DATASET_ID_PREFIX} — if we see that
+	 * prefix on a Property that came back as a scalar, the original input was
+	 * a single-element list and we have to wrap the value in one again.
+	 */
+	private static boolean isCollapsedSingletonListItem(PropertyVO propertyVO) {
+		URI datasetId = propertyVO.getDatasetId();
+		return datasetId != null
+				&& datasetId.toString().startsWith(JavaObjectMapper.LIST_ITEM_DATASET_ID_PREFIX);
+	}
+
 	private Map.Entry<String, Object> fromProperty(String key, PropertyVO propertyVO) {
 		if (propertyVO.getAdditionalProperties() != null && !propertyVO.getAdditionalProperties().isEmpty()) {
 			return new AbstractMap.SimpleEntry<>(key, propertyVO.getAdditionalProperties().entrySet()
 					.stream()
 					.map(entry -> {
 						if (entry.getValue() instanceof PropertyVO pvo) {
-							return fromProperty(entry.getKey(), pvo);
+							return fromProperty(ReservedWordHandler.removeEscape(entry.getKey()), pvo);
 						} else if (entry.getValue() instanceof RelationshipVO rvo) {
-							return fromRelationship(entry.getKey(), rvo);
+							return fromRelationship(ReservedWordHandler.removeEscape(entry.getKey()), rvo);
 						} else if (entry.getValue() instanceof PropertyListVO plvo) {
 							List<Object> valueList = plvo.stream()
 									.map(pvo -> fromProperty(entry.getKey(), pvo))
 									.map(Map.Entry::getValue)
 									.toList();
-							return new AbstractMap.SimpleEntry<>(key, valueList);
+							return new AbstractMap.SimpleEntry<>(ReservedWordHandler.removeEscape(entry.getKey()), valueList);
 						} else {
 							throw new MappingException(String.format("Entry value is not supported. Was: %s", entry.getValue()));
 						}
@@ -318,7 +334,11 @@ public class EntityVOMapper extends Mapper {
 					.filter(entry -> entry.getValue() != null)
 					.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
 		} else {
-			return new AbstractMap.SimpleEntry<>(key, propertyVO.getValue());
+			Object value = propertyVO.getValue();
+			if (isCollapsedSingletonListItem(propertyVO)) {
+				value = List.of(value);
+			}
+			return new AbstractMap.SimpleEntry<>(key, value);
 		}
 	}
 
