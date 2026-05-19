@@ -28,6 +28,16 @@ public class JavaObjectMapper extends Mapper {
 
 	// name of the property containing the ID
 	private static final String ID_PROPERTY = "id";
+
+	/**
+	 * URN prefix for synthetic datasetIds attached to each item of a plain-list
+	 * value persisted as a {@code PropertyListVO}. The datasetIds give each item
+	 * the multi-instance Property semantics that NGSI-LD brokers must preserve
+	 * — without them, a single-element array inside {@code Property.value} can
+	 * be compacted to its scalar form on retrieval (JSON-LD compaction).
+	 */
+	private static final String LIST_ITEM_DATASET_ID_PREFIX = "urn:ngsi-ld:dataset:list-item:";
+
 	private final MappingProperties mappingProperties;
 	private final ObjectMapper objectMapper;
 
@@ -407,9 +417,32 @@ public class JavaObjectMapper extends Mapper {
 
 
 	private AdditionalPropertyVO objectToAdditionalProperty(Object o) {
+		if (o instanceof List<?> objectList && objectList.isEmpty()) {
+			// Preserve empty arrays as empty arrays on the wire.
+			// Without this, the empty list would fall through to the Map branch
+			// below (toMap on a Collection returns Map.of()) and be persisted as
+			// an empty object {}, which fails to round-trip back to a List.
+			return new PropertyVO().value(new ArrayList<>());
+		}
 		if (o instanceof List<?> objectList && !objectList.isEmpty()) {
 			if (isPlain(objectList.get(0))) {
-				return new PropertyVO().value(listToEscapedMap(objectList));
+				// Use a PropertyListVO with synthetic datasetIds (one per item)
+				// instead of a single Property carrying a JSON array as its value.
+				// Otherwise NGSI-LD brokers may compact a single-element array to
+				// its scalar form on retrieval (JSON-LD compaction is allowed for
+				// values inside Property.value), which loses the array shape and
+				// breaks round-trip. A Property with multiple instances (one per
+				// datasetId) is the canonical NGSI-LD way to express a list of
+				// values; brokers must preserve every instance as a separate
+				// Property in the response.
+				PropertyListVO list = new PropertyListVO();
+				for (int i = 0; i < objectList.size(); i++) {
+					PropertyVO p = new PropertyVO();
+					p.setValue(objectList.get(i));
+					p.setDatasetId(URI.create(LIST_ITEM_DATASET_ID_PREFIX + i));
+					list.add(p);
+				}
+				return list;
 			} else {
 				PropertyListVO propertyVOS = new PropertyListVO();
 				RelationshipListVO relationshipVOS = new RelationshipListVO();
