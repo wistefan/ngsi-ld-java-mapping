@@ -36,7 +36,7 @@ public class JavaObjectMapper extends Mapper {
 	 * — without them, a single-element array inside {@code Property.value} can
 	 * be compacted to its scalar form on retrieval (JSON-LD compaction).
 	 */
-	public static final String LIST_ITEM_DATASET_ID_PREFIX = "urn:ngsi-ld:dataset:list-item:";
+	private static final String LIST_ITEM_DATASET_ID_PREFIX = "urn:ngsi-ld:dataset:list-item:";
 
 	private final MappingProperties mappingProperties;
 	private final ObjectMapper objectMapper;

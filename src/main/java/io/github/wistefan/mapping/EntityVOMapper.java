@@ -297,19 +297,16 @@ public class EntityVOMapper extends Mapper {
 	}
 
 	/**
-	 * NGSI-LD brokers are allowed to compact a multi-instance Property that
-	 * happens to have only one instance back to a single Property in the
-	 * response (the array wrapper is dropped). When {@link JavaObjectMapper}
-	 * persists a plain-value list it tags every {@code PropertyVO} with a
-	 * synthetic {@code datasetId} prefixed by
-	 * {@link JavaObjectMapper#LIST_ITEM_DATASET_ID_PREFIX} — if we see that
-	 * prefix on a Property that came back as a scalar, the original input was
-	 * a single-element list and we have to wrap the value in one again.
+	 * Per NGSI-LD semantics a {@code PropertyVO} bearing a {@code datasetId}
+	 * is one instance of a multi-instance attribute — i.e. one item of a
+	 * list. When the broker compacts a multi-instance attribute that holds a
+	 * single instance the array wrapper is dropped on the wire, but the
+	 * {@code datasetId} survives, so any non-null value here signals that
+	 * the original input was a list and we have to wrap the scalar value in
+	 * a single-element {@link List} on the way back.
 	 */
 	private static boolean isCollapsedSingletonListItem(PropertyVO propertyVO) {
-		URI datasetId = propertyVO.getDatasetId();
-		return datasetId != null
-				&& datasetId.toString().startsWith(JavaObjectMapper.LIST_ITEM_DATASET_ID_PREFIX);
+		return propertyVO.getDatasetId() != null;
 	}
 
 	private Map.Entry<String, Object> fromProperty(String key, PropertyVO propertyVO) {
