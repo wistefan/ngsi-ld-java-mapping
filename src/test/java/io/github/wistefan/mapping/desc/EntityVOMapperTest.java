@@ -229,6 +229,37 @@ class EntityVOMapperTest {
 		assertEquals(expectedPojo, myPojoWithUnmappedProperties, "A Property bearing the synthetic list-item datasetId must round-trip as a single-element list.");
 	}
 
+	@DisplayName("Reconstruct a multi-element list from a real multi-instance Property (does NOT wrap each item).")
+	@Test
+	void testWithMultiInstancePropertyList() throws Exception {
+		// Companion case to testWithSingleElementListCollapsedByBroker.
+		// When the wire format carries a TRUE multi-instance attribute (an array of
+		// PropertyVO, one per item), every item legitimately has a datasetId
+		// because NGSI-LD requires it for multi-instance attributes. The
+		// "datasetId-means-singleton-compacted" heuristic must NOT fire here:
+		// otherwise the round-trip turns ["a", "b"] into [["a"], ["b"]].
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty("extensionArray", List.of("a", "b")));
+
+		MyPojoWithUnmappedProperties expectedPojo = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		expectedPojo.setMyName("my-name");
+		expectedPojo.setUnmappedProperties(unmappedProperties);
+
+		String entityString = "{"
+				+ "\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\","
+				+ "\"id\":\"urn:ngsi-ld:my-pojo:the-entity\","
+				+ "\"type\":\"my-pojo\","
+				+ "\"name\":{\"value\":\"my-name\",\"type\":\"Property\"},"
+				+ "\"extensionArray\":["
+				+   "{\"type\":\"Property\",\"datasetId\":\"urn:ngsi-ld:dataset:list-item:0\",\"value\":\"a\"},"
+				+   "{\"type\":\"Property\",\"datasetId\":\"urn:ngsi-ld:dataset:list-item:1\",\"value\":\"b\"}"
+				+ "]}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithUnmappedProperties actual = entityVOMapper.fromEntityVO(theEntity, MyPojoWithUnmappedProperties.class).block();
+		assertEquals(expectedPojo, actual, "A real multi-instance attribute must round-trip as a flat list, not a list-of-singletons.");
+	}
+
 	@DisplayName("Map entity with an unmapped property whose value is an empty list (preserves array shape).")
 	@Test
 	void testWithUnmappedPropertyContainingEmptyList() throws Exception {
@@ -337,6 +368,98 @@ class EntityVOMapperTest {
 
 		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = entityVOMapper.fromEntityVO(theEntity, MyPojoWithUnmappedProperties.class).block();
 		assertEquals(expectedPojo, myPojoWithUnmappedProperties, "The inner list's key must be preserved (not overwritten by the outer property's name).");
+	}
+
+	@DisplayName("Map Pojo with a mapped sub-property whose nested object carries reserved-word fields (id/value/type).")
+	@Test
+	void testSubPropertyWithNestedReservedFieldsRoundTrip() throws Exception {
+		// Reproduces the TMForum *RefOrValue regression after the
+		// VO_FIELD_COLLISIONS guard was added: a parent entity has a
+		// @AttributeSetter(PROPERTY) field whose Java type is a complex object
+		// holding reserved-word fields (id, value, type). On the wire those keys
+		// are escaped (tmfEscaped-id, …) so the EscapeCleaningParser does NOT
+		// route them to PropertyVO.setValue / EntityVO.setId. But by the time we
+		// hand the Property.value Map to objectMapper.convertValue(...) to
+		// materialize the USER POJO, the escape is in the way — Jackson can't
+		// find a field literally called "tmfEscaped-id" on the target class and
+		// silently drops the value. EntityVOMapper.handleProperty must surface
+		// the original names before delegating to Jackson.
+		MySubPropertyRefOrValue expectedSub = new MySubPropertyRefOrValue();
+		expectedSub.setId(URI.create("urn:ref:42"));
+		expectedSub.setHref(URI.create("http://my-ref.de"));
+		expectedSub.setValue("the-value");
+		expectedSub.setType("the-type");
+		expectedSub.setName("the-name");
+
+		MyPojoWithSubPropertyRefOrValue expectedPojo = new MyPojoWithSubPropertyRefOrValue("urn:ngsi-ld:complex-pojo:the-test-pojo");
+		expectedPojo.setMyRefOrValue(expectedSub);
+
+		String entityString = "{"
+				+ "\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\","
+				+ "\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\","
+				+ "\"type\":\"complex-pojo\","
+				+ "\"myRefOrValue\":{"
+				+   "\"type\":\"Property\","
+				+   "\"value\":{"
+				+     "\"tmfEscaped-id\":\"urn:ref:42\","
+				+     "\"href\":\"http://my-ref.de\","
+				+     "\"tmfEscaped-value\":\"the-value\","
+				+     "\"tmfEscaped-type\":\"the-type\","
+				+     "\"name\":\"the-name\""
+				+   "}"
+				+ "}}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithSubPropertyRefOrValue actual = entityVOMapper.fromEntityVO(theEntity, MyPojoWithSubPropertyRefOrValue.class).block();
+		assertEquals(expectedPojo, actual, "Reserved-word fields nested inside a mapped property must round-trip.");
+	}
+
+	@DisplayName("Map Pojo with a mapped property-list whose elements carry reserved-word fields (id/value/type).")
+	@Test
+	void testPropertyListWithNestedReservedFieldsRoundTrip() throws Exception {
+		// Same regression as the sub-property variant, exercised through the
+		// PROPERTY_LIST code path (handlePropertyList → propertyListToTargetClass).
+		MySubPropertyRefOrValue expectedSub1 = new MySubPropertyRefOrValue();
+		expectedSub1.setId(URI.create("urn:ref:1"));
+		expectedSub1.setHref(URI.create("http://my-ref.de/1"));
+		expectedSub1.setValue("value-1");
+		expectedSub1.setType("type-1");
+		expectedSub1.setName("name-1");
+
+		MySubPropertyRefOrValue expectedSub2 = new MySubPropertyRefOrValue();
+		expectedSub2.setId(URI.create("urn:ref:2"));
+		expectedSub2.setHref(URI.create("http://my-ref.de/2"));
+		expectedSub2.setValue("value-2");
+		expectedSub2.setType("type-2");
+		expectedSub2.setName("name-2");
+
+		MyPojoWithSubPropertyRefOrValue expectedPojo = new MyPojoWithSubPropertyRefOrValue("urn:ngsi-ld:complex-pojo:the-test-pojo");
+		expectedPojo.setMyRefOrValueList(List.of(expectedSub1, expectedSub2));
+
+		String entityString = "{"
+				+ "\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\","
+				+ "\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\","
+				+ "\"type\":\"complex-pojo\","
+				+ "\"myRefOrValueList\":["
+				+   "{\"type\":\"Property\",\"value\":{"
+				+     "\"tmfEscaped-id\":\"urn:ref:1\","
+				+     "\"href\":\"http://my-ref.de/1\","
+				+     "\"tmfEscaped-value\":\"value-1\","
+				+     "\"tmfEscaped-type\":\"type-1\","
+				+     "\"name\":\"name-1\""
+				+   "}},"
+				+   "{\"type\":\"Property\",\"value\":{"
+				+     "\"tmfEscaped-id\":\"urn:ref:2\","
+				+     "\"href\":\"http://my-ref.de/2\","
+				+     "\"tmfEscaped-value\":\"value-2\","
+				+     "\"tmfEscaped-type\":\"type-2\","
+				+     "\"name\":\"name-2\""
+				+   "}}"
+				+ "]}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithSubPropertyRefOrValue actual = entityVOMapper.fromEntityVO(theEntity, MyPojoWithSubPropertyRefOrValue.class).block();
+		assertEquals(expectedPojo, actual, "Reserved-word fields inside a mapped property-list element must round-trip.");
 	}
 
 	@DisplayName("Map Pojo with a field that is an object.")
