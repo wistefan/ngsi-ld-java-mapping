@@ -483,6 +483,18 @@ public class JavaObjectMapper extends Mapper {
 			Map<String, AdditionalPropertyVO> values = new HashMap<>();
 			objectMap.forEach((key, value) -> {
 				if (key instanceof String stringKey) {
+					// Skip lists nested inside a Map: they would be fan-out as a
+					// PropertyListVO sibling (with one PropertyVO per item, each
+					// bearing a synthetic datasetId). Brokers then consolidate that
+					// multi-instance attribute against the matching key inside our
+					// Property.value Map, collapsing a single-element array back to
+					// its scalar form and breaking the round-trip
+					// (["step-cache"] becomes "step-cache" on retrieval). The list
+					// shape is already preserved by toEscapedMap below, so no
+					// sibling is needed.
+					if (value instanceof List<?>) {
+						return;
+					}
 					propertyVO.setAdditionalProperties(ReservedWordHandler.escapeReservedWords(stringKey), objectToAdditionalProperty(value));
 				}
 

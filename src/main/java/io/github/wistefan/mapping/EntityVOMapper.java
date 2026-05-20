@@ -252,10 +252,18 @@ public class EntityVOMapper extends Mapper {
 		unmappedProperty.setName(ReservedWordHandler.removeEscape(unmappedAdditionalProperty.getKey()));
 
 		if (unmappedAdditionalProperty.getValue() instanceof PropertyListVO propertyListVO) {
+			// PropertyListVO is — by definition — a real multi-instance attribute:
+			// every PropertyVO inside carries a datasetId because NGSI-LD requires
+			// it for multi-instance attributes. Routing each one through fromProperty
+			// would re-trigger the singleton-collapse heuristic
+			// (isCollapsedSingletonListItem returns true on every non-null datasetId)
+			// and wrap each item into a single-element list, turning
+			// [a, b] into [[a], [b]]. We already know we have a list here, so just
+			// extract the raw values. Unescape reserved-word keys in the value
+			// tree so consumers see the original key names.
 			unmappedProperty.setValue(
 					propertyListVO.stream()
-							.map(pvo -> fromProperty(unmappedAdditionalProperty.getKey(), pvo))
-							.map(Map.Entry::getValue)
+							.map(pvo -> unescapeReservedKeys(pvo.getValue()))
 							.toList());
 		} else if (unmappedAdditionalProperty.getValue() instanceof RelationshipListVO relationshipListVO) {
 			unmappedProperty.setValue(
@@ -311,7 +319,30 @@ public class EntityVOMapper extends Mapper {
 
 	private Map.Entry<String, Object> fromProperty(String key, PropertyVO propertyVO) {
 		if (propertyVO.getAdditionalProperties() != null && !propertyVO.getAdditionalProperties().isEmpty()) {
-			return new AbstractMap.SimpleEntry<>(key, propertyVO.getAdditionalProperties().entrySet()
+			// Build the user-facing value by overlaying additionalProperties
+			// siblings on top of the raw Property.value Map. Both sources can
+			// carry useful information:
+			//   - Property.value is the canonical JSON snapshot of the data
+			//     (nested arrays/objects intact, every key present).
+			//   - Siblings (additionalProperties) carry NGSI-LD sub-attribute
+			//     metadata — e.g. multi-instance attributes promoted to
+			//     PropertyListVO with datasetIds, or reserved-word keys
+			//     surfaced via tmfEscaped-* siblings.
+			// Siblings overlay the base because they carry the user-facing
+			// form (an unescape from tmfEscaped-value to value happens here).
+			// Without using value as the base we would lose any key that
+			// JavaObjectMapper deliberately did NOT fan out — in particular
+			// nested lists, which are intentionally kept only inside
+			// Property.value to avoid brokers consolidating a single-element
+			// array back to a scalar.
+			Map<String, Object> merged = new LinkedHashMap<>();
+			Object rawValue = unescapeReservedKeys(propertyVO.getValue());
+			if (rawValue instanceof Map<?, ?> baseMap) {
+				for (Map.Entry<?, ?> e : baseMap.entrySet()) {
+					merged.put(String.valueOf(e.getKey()), e.getValue());
+				}
+			}
+			propertyVO.getAdditionalProperties().entrySet()
 					.stream()
 					.map(entry -> {
 						if (entry.getValue() instanceof PropertyVO pvo) {
@@ -319,9 +350,13 @@ public class EntityVOMapper extends Mapper {
 						} else if (entry.getValue() instanceof RelationshipVO rvo) {
 							return fromRelationship(ReservedWordHandler.removeEscape(entry.getKey()), rvo);
 						} else if (entry.getValue() instanceof PropertyListVO plvo) {
+							// See toUnmappedProperty for the rationale: PropertyListVO
+							// holds real multi-instance items, so extract the raw values
+							// instead of recursing through fromProperty (which would
+							// wrap each item into a single-element list). Also unescape
+							// reserved-word keys in the value tree.
 							List<Object> valueList = plvo.stream()
-									.map(pvo -> fromProperty(entry.getKey(), pvo))
-									.map(Map.Entry::getValue)
+									.map(pvo -> unescapeReservedKeys(pvo.getValue()))
 									.toList();
 							return new AbstractMap.SimpleEntry<>(ReservedWordHandler.removeEscape(entry.getKey()), valueList);
 						} else {
@@ -329,9 +364,10 @@ public class EntityVOMapper extends Mapper {
 						}
 					})
 					.filter(entry -> entry.getValue() != null)
-					.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+					.forEach(entry -> merged.put(entry.getKey(), entry.getValue()));
+			return new AbstractMap.SimpleEntry<>(key, merged);
 		} else {
-			Object value = propertyVO.getValue();
+			Object value = unescapeReservedKeys(propertyVO.getValue());
 			if (isCollapsedSingletonListItem(propertyVO)) {
 				value = List.of(value);
 			}
@@ -351,9 +387,9 @@ public class EntityVOMapper extends Mapper {
 	 */
 	private <T> Mono<T> handleProperty(AdditionalPropertyVO propertyValue, T objectUnderConstruction, Method setter, Class<?> parameterType) {
 		if (propertyValue instanceof PropertyVO propertyVO) {
-			return invokeWithExceptionHandling(setter, objectUnderConstruction, objectMapper.convertValue(propertyVO.getValue(), parameterType));
+			return invokeWithExceptionHandling(setter, objectUnderConstruction, objectMapper.convertValue(unescapeReservedKeys(propertyVO.getValue()), parameterType));
 		} else if (propertyValue instanceof GeoPropertyVO geoPropertyVO) {
-			return invokeWithExceptionHandling(setter, objectUnderConstruction, objectMapper.convertValue(geoPropertyVO.getValue(), parameterType));
+			return invokeWithExceptionHandling(setter, objectUnderConstruction, objectMapper.convertValue(unescapeReservedKeys(geoPropertyVO.getValue()), parameterType));
 		} else {
 			log.error("Mapping exception");
 			return Mono.error(new MappingException(String.format("The attribute is not a valid property: %s ", propertyValue)));
@@ -714,11 +750,48 @@ public class EntityVOMapper extends Mapper {
 	private <T> List<T> propertyListToTargetClass(PropertyListVO propertyVOS, Class<T> targetClass) {
 		return propertyVOS.stream().map(propertyEntry -> {
 			try {
-				return objectMapper.convertValue(propertyEntry.getValue(), targetClass);
+				return objectMapper.convertValue(unescapeReservedKeys(propertyEntry.getValue()), targetClass);
 			} catch (IllegalArgumentException e) {
 				return null;
 			}
 		}).filter(Objects::nonNull).toList();
+	}
+
+	/**
+	 * Recursively strip the {@code tmfEscaped-} prefix from any keys in a
+	 * Map/List value tree, returning a copy with the original key names.
+	 *
+	 * <p>Reserved-word keys ({@code id}, {@code value}, {@code type}) arrive
+	 * here still escaped because {@link ReservedWordHandler#canUnescapeDuringParsing}
+	 * deliberately refuses to unescape them at parse time — that protection
+	 * exists so Jackson does not route them to the structural setters on the
+	 * lib's own VO classes ({@code PropertyVO.setValue}, {@code EntityVO.setId},
+	 * …). The protection only matters at the VO layer: once we hand a
+	 * {@code Property.value} payload over to Jackson to materialize a USER
+	 * POJO, an escaped key like {@code tmfEscaped-id} no longer matches any
+	 * field on the target class and the value is silently dropped.
+	 *
+	 * <p>Walk the tree once and surface the original names so the
+	 * {@code objectMapper.convertValue(…, userPojoClass)} call sites can resolve
+	 * them. Non-Map/List values are returned as-is.
+	 */
+	private static Object unescapeReservedKeys(Object value) {
+		if (value instanceof Map<?, ?> map) {
+			Map<String, Object> result = new LinkedHashMap<>(map.size());
+			for (Map.Entry<?, ?> e : map.entrySet()) {
+				String key = String.valueOf(e.getKey());
+				result.put(ReservedWordHandler.removeEscape(key), unescapeReservedKeys(e.getValue()));
+			}
+			return result;
+		}
+		if (value instanceof List<?> list) {
+			List<Object> result = new ArrayList<>(list.size());
+			for (Object item : list) {
+				result.add(unescapeReservedKeys(item));
+			}
+			return result;
+		}
+		return value;
 	}
 
 	/**
