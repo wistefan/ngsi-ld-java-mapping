@@ -24,6 +24,20 @@ public class ReservedWordHandler {
 	private static final List<String> RESERVED_WORDS = List.of("id", "@id", "value", "@value", "type", "@type", "context", "@context");
 
 	/**
+	 * Subset of {@link #RESERVED_WORDS} whose JSON name (after unescape) would
+	 * collide with an explicit setter on the generated NGSI-LD VOs
+	 * ({@code PropertyVO.value}, {@code PropertyVO.type}, {@code EntityVO.id}, …).
+	 *
+	 * When such a name appears as an additional attribute on the wire (i.e. with
+	 * the {@link #ESCAPE_PREFIX}), the {@link EscapeCleaningParser} must leave the
+	 * prefix in place so Jackson routes the entry through {@code @JsonAnySetter}
+	 * into {@code additionalProperties} instead of overwriting the structural field.
+	 * The unescape then happens later — in {@code EntityVOMapper} — when emitting
+	 * the user-facing keys.
+	 */
+	private static final List<String> VO_FIELD_COLLISIONS = List.of("value", "type", "id");
+
+	/**
 	 * Prefix to be used for escaping the reserved words.
 	 */
 	private static final String ESCAPE_PREFIX = "tmfEscaped-";
@@ -64,6 +78,27 @@ public class ReservedWordHandler {
 			return w;
 		}
 		return key;
+	}
+
+	/**
+	 * Whether the given (potentially escaped) key should be unescaped during
+	 * JSON parsing — i.e. it is safe to surface the original name at the Jackson
+	 * field-resolution stage without colliding with an explicit setter on a VO.
+	 *
+	 * Returns {@code false} for keys whose unescaped form is in
+	 * {@link #VO_FIELD_COLLISIONS}: those must keep the {@link #ESCAPE_PREFIX}
+	 * until {@code EntityVOMapper} surfaces them, otherwise Jackson would route
+	 * the entry to the structural field instead of {@code @JsonAnySetter}.
+	 *
+	 * @param key the key as it arrives from the broker (possibly escaped)
+	 * @return true if the parser may safely strip the escape prefix
+	 */
+	public static boolean canUnescapeDuringParsing(String key) {
+		if (!isReservedProperty(key)) {
+			return false;
+		}
+		String unescaped = key.replaceFirst(ESCAPE_PREFIX, "");
+		return !VO_FIELD_COLLISIONS.contains(unescaped);
 	}
 
 }

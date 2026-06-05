@@ -19,6 +19,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -399,10 +400,86 @@ class JavaObjectMapperTest {
 				"The pojo should have been translated into a valid entity");
 	}
 
+	@DisplayName("Map entity with a deeply nested list inside a Map-of-list-of-maps (reproduces the orchestrationPlan blueprint shape).")
+	@Test
+	void testDeepNestedListInsideMapOfListOfMaps() throws Exception {
+		// Reproduces the TMForum Blueprint shape:
+		//   orchestrationPlan: { steps: [ { id: ..., dependsOn: [..] }, ... ], version: "1.0" }
+		// The bug to be guarded against: when serialising for POST, the
+		// single-element nested list (dependsOn: ["step-cache"]) MUST stay a
+		// JSON array — not be flattened to a scalar — so the broker stores it
+		// as an array and the round-trip preserves the shape.
+		LinkedHashMap<String, Object> step1 = new LinkedHashMap<>();
+		step1.put("id", "step-cache");
+		step1.put("dependsOn", List.of());
+
+		LinkedHashMap<String, Object> step2 = new LinkedHashMap<>();
+		step2.put("id", "step-web");
+		step2.put("dependsOn", List.of("step-cache"));
+
+		LinkedHashMap<String, Object> orchestrationPlan = new LinkedHashMap<>();
+		orchestrationPlan.put("steps", List.of(step1, step2));
+		orchestrationPlan.put("version", "1.0");
+
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty("orchestrationPlan", orchestrationPlan));
+
+		MyPojoWithUnmappedProperties pojo = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		pojo.setMyName("my-name");
+		pojo.setUnmappedProperties(unmappedProperties);
+
+		String json = OBJECT_MAPPER.writeValueAsString(javaObjectMapper.toEntityVO(pojo));
+		// The serialised JSON sent to the broker MUST contain the array form
+		// — not the scalar "step-cache" — for dependsOn.
+		assertTrue(json.contains("\"dependsOn\":[\"step-cache\"]"),
+				"dependsOn must round-trip as a JSON array in the wire payload, but was: " + json);
+		assertFalse(json.contains("\"dependsOn\":\"step-cache\""),
+				"dependsOn must NOT be flattened to a scalar in the wire payload, but was: " + json);
+	}
+
+	@DisplayName("Map entity with a Map-valued unmapped property containing a nested list (no fan-out sibling for the list).")
+	@Test
+	void testWithUnmappedPropertyMapContainingNestedList() throws Exception {
+		// Companion to the read-side regression in EntityVOMapperTest: when a
+		// Map-valued unmapped property carries a nested list (e.g.
+		// orchestrationPlan.step.dependsOn = ["step-cache"]), the list MUST NOT
+		// be promoted to a sibling multi-instance attribute (PropertyListVO with
+		// synthetic datasetIds). Brokers consolidate that sibling against the
+		// matching key inside Property.value and collapse single-element arrays
+		// to scalars, breaking the round-trip ("step-cache" instead of
+		// ["step-cache"]). The list shape lives in Property.value alone.
+		// Non-list keys still get the fan-out sibling.
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\","
+				+ "\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\","
+				+ "\"complex\":{"
+				+   "\"value\":{\"myList\":[\"a\"],\"simpleString\":\"x\"},"
+				+   "\"type\":\"Property\","
+				+   "\"simpleString\":{\"value\":\"x\",\"type\":\"Property\"}"
+				+ "},"
+				+ "\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty(
+				"complex",
+				Map.of("simpleString", "x", "myList", List.of("a"))));
+
+		MyPojoWithUnmappedProperties pojo = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		pojo.setMyName("my-name");
+		pojo.setUnmappedProperties(unmappedProperties);
+
+		assertEquals(expectedJson,
+				OBJECT_MAPPER.writeValueAsString(javaObjectMapper.toEntityVO(pojo)),
+				"Nested lists inside a Map-valued unmapped property must stay in Property.value and never appear as a multi-instance sibling.");
+	}
+
 	@DisplayName("Map entity with an unmapped property list.")
 	@Test
 	void testWithUnmappedPropertiesList() throws Exception {
-		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"name\":{\"value\":\"my-name\",\"type\":\"Property\"},\"test\":{\"value\":[1,2,3],\"type\":\"Property\"}}";
+		// Plain lists are emitted as a multi-instance Property (PropertyListVO),
+		// one PropertyVO per item with a synthetic datasetId. This forces NGSI-LD
+		// brokers to preserve the array shape across JSON-LD compaction — the
+		// older form (Property carrying a JSON array as `value`) was vulnerable
+		// to single-element arrays being scalarised on retrieval.
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"name\":{\"value\":\"my-name\",\"type\":\"Property\"},\"test\":[{\"value\":1,\"datasetId\":\"urn:ngsi-ld:dataset:list-item:0\",\"type\":\"Property\"},{\"value\":2,\"datasetId\":\"urn:ngsi-ld:dataset:list-item:1\",\"type\":\"Property\"},{\"value\":3,\"datasetId\":\"urn:ngsi-ld:dataset:list-item:2\",\"type\":\"Property\"}]}";
 		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
 		unmappedProperties.add(new UnmappedProperty("test", List.of(1, 2, 3)));
 
@@ -419,7 +496,7 @@ class JavaObjectMapperTest {
 	@DisplayName("Map entity with multiple unmapped properties.")
 	@Test
 	void testWithMultipleUnmappedProperties() throws Exception {
-		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"name\":{\"value\":\"my-name\",\"type\":\"Property\"},\"other\":{\"value\":\"property\",\"type\":\"Property\"},\"test\":{\"value\":[1,2,3],\"type\":\"Property\"}}";
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"name\":{\"value\":\"my-name\",\"type\":\"Property\"},\"other\":{\"value\":\"property\",\"type\":\"Property\"},\"test\":[{\"value\":1,\"datasetId\":\"urn:ngsi-ld:dataset:list-item:0\",\"type\":\"Property\"},{\"value\":2,\"datasetId\":\"urn:ngsi-ld:dataset:list-item:1\",\"type\":\"Property\"},{\"value\":3,\"datasetId\":\"urn:ngsi-ld:dataset:list-item:2\",\"type\":\"Property\"}]}";
 		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
 		unmappedProperties.add(new UnmappedProperty("test", List.of(1, 2, 3)));
 		unmappedProperties.add(new UnmappedProperty("other", "property"));
