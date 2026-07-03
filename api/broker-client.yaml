@@ -52,11 +52,17 @@ paths:
         - $ref: '#/components/parameters/csf'
         - $ref: '#/components/parameters/limit'
         - $ref: '#/components/parameters/offset'
+        - $ref: '#/components/parameters/count'
         - $ref: '#/components/parameters/options'
         - $ref: '#/components/parameters/link'
       responses:
         '200':
           description: OK
+          headers:
+            NGSILD-Results-Count:
+              description: Total count of matching entities, set when the count query parameter is true
+              schema:
+                type: integer
           content:
             application/ld+json:
               schema:
@@ -269,9 +275,15 @@ paths:
         - Subscriptions
       parameters:
         - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/count'
       responses:
         '200':
           description: OK
+          headers:
+            NGSILD-Results-Count:
+              description: Total count of matching subscriptions, set when the count query parameter is true
+              schema:
+                type: integer
           content:
             application/ld+json:
               schema:
@@ -415,9 +427,15 @@ paths:
         - $ref: '#/components/parameters/coordinates'
         - $ref: '#/components/parameters/geoproperty'
         - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/count'
       responses:
         '200':
           description: OK
+          headers:
+            NGSILD-Results-Count:
+              description: Total count of matching context source registrations, set when the count query parameter is true
+              schema:
+                type: integer
           content:
             application/ld+json:
               schema:
@@ -521,9 +539,15 @@ paths:
         - CSourceSubscriptions
       parameters:
         - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/count'
       responses:
         '200':
           description: OK
+          headers:
+            NGSILD-Results-Count:
+              description: Total count of matching context source subscriptions, set when the count query parameter is true
+              schema:
+                type: integer
           content:
             application/ld+json:
               schema:
@@ -892,6 +916,14 @@ components:
       schema:
         type: integer
         default: 0
+    count:
+      name: count
+      description: If set to true, the total count of matching entities is returned in the response as the NGSILD-Results-Count HTTP header
+      in: query
+      required: false
+      schema:
+        type: boolean
+        default: false
     options:
       name: options
       description: Options dictionary
