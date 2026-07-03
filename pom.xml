@@ -412,7 +412,7 @@
                                 <clientId>ngsi</clientId>
                                 <fullJavaUtil>true</fullJavaUtil>
                                 <useOptional>false</useOptional>
-                                <useGenericResponse>false</useGenericResponse>
+                                <useGenericResponse>true</useGenericResponse>
                                 <useLombokGenerated>true</useLombokGenerated>
                                 <introspected>true</introspected>
                                 <generateAliasAsModel>false</generateAliasAsModel>
