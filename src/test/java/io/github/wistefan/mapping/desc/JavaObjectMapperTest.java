@@ -334,7 +334,7 @@ class JavaObjectMapperTest {
 	@DisplayName("Map entity with a simple unmapped property containing a reserved work.")
 	@Test
 	void testWithUnmappedPropertiesReservedWord() throws Exception {
-		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"name\":{\"value\":\"my-name\",\"type\":\"Property\"},\"test\":[{\"value\":{\"tmfEscaped-@context\":\"test\"},\"type\":\"Property\",\"tmfEscaped-@context\":{\"value\":\"test\",\"type\":\"Property\"}}],\"tmfEscaped-@id\":{\"value\":\"test\",\"type\":\"Property\"}}";
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"name\":{\"value\":\"my-name\",\"type\":\"Property\"},\"test\":[{\"value\":{\"tmfEscaped-@context\":\"test\"},\"datasetId\":\"urn:ngsi-ld:dataset:list-item:0\",\"type\":\"Property\",\"tmfEscaped-@context\":{\"value\":\"test\",\"type\":\"Property\"}}],\"tmfEscaped-@id\":{\"value\":\"test\",\"type\":\"Property\"}}";
 		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
 		unmappedProperties.add(new UnmappedProperty("@id", "test"));
 		unmappedProperties.add(new UnmappedProperty("test", List.of(Map.of("@context", "test"))));
@@ -490,6 +490,33 @@ class JavaObjectMapperTest {
 		assertEquals(expectedJson,
 				OBJECT_MAPPER.writeValueAsString(javaObjectMapper.toEntityVO(myPojoWithUnmappedProperties)),
 				"The pojo should have been translated into a valid entity");
+	}
+
+	@DisplayName("Map entity with an unmapped property list of objects (e.g. relatedParty-shaped entries).")
+	@Test
+	void testWithUnmappedPropertiesListOfObjects() throws Exception {
+		// Reproduces a real-world regression: an unmapped/extension property
+		// (e.g. relatedParty coming through a @schemaLocation extension, not
+		// modeled as a typed domain field) holding a list of two-or-more
+		// objects. Without a distinct datasetId per instance, NGSI-LD brokers
+		// such as Scorpio reject the multi-instance attribute outright
+		// ("Duplicated datasetId or multiple entries with no datasetId
+		// found"), since a datasetId is required to disambiguate every
+		// instance but one. Each object item must get the same synthetic
+		// per-index datasetId treatment as plain-value list items already do.
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"name\":{\"value\":\"my-name\",\"type\":\"Property\"},\"relatedParty\":[{\"value\":{\"role\":\"customer\",\"tmfEscaped-id\":\"urn:ngsi-ld:organization:1\"},\"datasetId\":\"urn:ngsi-ld:dataset:list-item:0\",\"type\":\"Property\",\"role\":{\"value\":\"customer\",\"type\":\"Property\"},\"tmfEscaped-id\":{\"value\":\"urn:ngsi-ld:organization:1\",\"type\":\"Property\"}},{\"value\":{\"role\":\"seller\",\"tmfEscaped-id\":\"urn:ngsi-ld:organization:2\"},\"datasetId\":\"urn:ngsi-ld:dataset:list-item:1\",\"type\":\"Property\",\"role\":{\"value\":\"seller\",\"type\":\"Property\"},\"tmfEscaped-id\":{\"value\":\"urn:ngsi-ld:organization:2\",\"type\":\"Property\"}}]}";
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty("relatedParty", List.of(
+				Map.of("id", "urn:ngsi-ld:organization:1", "role", "customer"),
+				Map.of("id", "urn:ngsi-ld:organization:2", "role", "seller"))));
+
+		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		myPojoWithUnmappedProperties.setMyName("my-name");
+		myPojoWithUnmappedProperties.setUnmappedProperties(unmappedProperties);
+
+		assertEquals(expectedJson,
+				OBJECT_MAPPER.writeValueAsString(javaObjectMapper.toEntityVO(myPojoWithUnmappedProperties)),
+				"Each object item in the list must carry its own distinct datasetId");
 	}
 
 
