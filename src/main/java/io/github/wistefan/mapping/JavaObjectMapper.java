@@ -1,12 +1,24 @@
 package io.github.wistefan.mapping;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.wistefan.mapping.annotations.*;
+import io.github.wistefan.mapping.annotations.AttributeGetter;
+import io.github.wistefan.mapping.annotations.AttributeSetter;
+import io.github.wistefan.mapping.annotations.AttributeType;
+import io.github.wistefan.mapping.annotations.DatasetId;
+import io.github.wistefan.mapping.annotations.EntityId;
+import io.github.wistefan.mapping.annotations.EntityType;
+import io.github.wistefan.mapping.annotations.RelationshipObject;
+import io.github.wistefan.mapping.annotations.UnmappedPropertiesGetter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.fiware.ngsi.model.*;
+import org.fiware.ngsi.model.AdditionalPropertyVO;
+import org.fiware.ngsi.model.EntityVO;
+import org.fiware.ngsi.model.GeoPropertyVO;
+import org.fiware.ngsi.model.PropertyListVO;
+import org.fiware.ngsi.model.PropertyVO;
+import org.fiware.ngsi.model.RelationshipListVO;
+import org.fiware.ngsi.model.RelationshipVO;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
@@ -14,7 +26,17 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.time.Instant;
-import java.util.*;
+import java.util.AbstractMap;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -391,7 +413,7 @@ public class JavaObjectMapper extends Mapper {
 		if (objectList == null || objectList.isEmpty()) {
 			return objectList;
 		}
-		if (isPlain(objectList.get(0))) {
+		if (isPlain(objectList.getFirst())) {
 			return objectList;
 		}
 		return objectList.stream()
@@ -402,16 +424,16 @@ public class JavaObjectMapper extends Mapper {
 	private Map<String, Object> toEscapedMap(Object o) {
 		Map<String, Object> escapedMap = new HashMap<>();
 		Map<String, Object> unescapedMap = toMap(o);
-		unescapedMap.entrySet().forEach(entry -> {
-			String escapedKey = ReservedWordHandler.escapeReservedWords(entry.getKey());
-			if (entry.getValue() instanceof List valueList) {
-				escapedMap.put(escapedKey, listToEscapedMap(valueList));
-			} else if (isPlain(entry.getValue())) {
-				escapedMap.put(escapedKey, entry.getValue());
-			} else {
-				escapedMap.put(escapedKey, toEscapedMap(entry.getValue()));
-			}
-		});
+		unescapedMap.forEach((key, value) -> {
+            String escapedKey = ReservedWordHandler.escapeReservedWords(key);
+            if (value instanceof List valueList) {
+                escapedMap.put(escapedKey, listToEscapedMap(valueList));
+            } else if (isPlain(value)) {
+                escapedMap.put(escapedKey, value);
+            } else {
+                escapedMap.put(escapedKey, toEscapedMap(value));
+            }
+        });
 		return escapedMap;
 	}
 
@@ -425,7 +447,7 @@ public class JavaObjectMapper extends Mapper {
 			return new PropertyVO().value(new ArrayList<>());
 		}
 		if (o instanceof List<?> objectList && !objectList.isEmpty()) {
-			if (isPlain(objectList.get(0))) {
+			if (isPlain(objectList.getFirst())) {
 				// Use a PropertyListVO with synthetic datasetIds (one per item)
 				// instead of a single Property carrying a JSON array as its value.
 				// Otherwise NGSI-LD brokers may compact a single-element array to
@@ -447,16 +469,18 @@ public class JavaObjectMapper extends Mapper {
 				PropertyListVO propertyVOS = new PropertyListVO();
 				RelationshipListVO relationshipVOS = new RelationshipListVO();
 				// as of now, we don't support property lists of property lists
-				objectList.stream()
-						.map(this::objectToAdditionalProperty)
-						.forEach(apvo -> {
-							if (apvo instanceof PropertyVO pvo) {
-								propertyVOS.add(pvo);
-							}
-							if (apvo instanceof RelationshipVO rvo) {
-								relationshipVOS.add(rvo);
-							}
-						});
+				for (int i = 0; i < objectList.size(); i++) {
+					AdditionalPropertyVO apvo = objectToAdditionalProperty(objectList.get(i));
+					URI datasetId = URI.create(LIST_ITEM_DATASET_ID_PREFIX + i);
+					if (apvo instanceof PropertyVO pvo) {
+						pvo.setDatasetId(datasetId);
+						propertyVOS.add(pvo);
+					}
+					if (apvo instanceof RelationshipVO rvo) {
+						rvo.setDatasetId(datasetId);
+						relationshipVOS.add(rvo);
+					}
+				}
 				if (!propertyVOS.isEmpty() && !relationshipVOS.isEmpty()) {
 					throw new MappingException("Mixed lists are not supported");
 				}
