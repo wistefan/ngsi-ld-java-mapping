@@ -45,6 +45,7 @@ paths:
         - $ref: '#/components/parameters/type'
         - $ref: '#/components/parameters/attrs'
         - $ref: '#/components/parameters/q'
+        - $ref: '#/components/parameters/orderBy'
         - $ref: '#/components/parameters/georel'
         - $ref: '#/components/parameters/geometry'
         - $ref: '#/components/parameters/coordinates'
@@ -276,6 +277,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/limit'
         - $ref: '#/components/parameters/count'
+        - $ref: '#/components/parameters/orderBy'
       responses:
         '200':
           description: OK
@@ -422,6 +424,7 @@ paths:
         - $ref: '#/components/parameters/type'
         - $ref: '#/components/parameters/attrs'
         - $ref: '#/components/parameters/q'
+        - $ref: '#/components/parameters/orderBy'
         - $ref: '#/components/parameters/georel'
         - $ref: '#/components/parameters/geometry'
         - $ref: '#/components/parameters/coordinates'
@@ -540,6 +543,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/limit'
         - $ref: '#/components/parameters/count'
+        - $ref: '#/components/parameters/orderBy'
       responses:
         '200':
           description: OK
@@ -924,6 +928,16 @@ components:
       schema:
         type: boolean
         default: false
+    orderBy:
+      name: orderBy
+      description: >-
+        Comma-separated list of properties to order the result by, each optionally followed by
+        ";asc" or ";desc" (e.g. "name;asc,billDate;desc"). If the direction is omitted for a
+        property, ascending order is used.
+      in: query
+      required: false
+      schema:
+        type: string
     options:
       name: options
       description: Options dictionary
