@@ -260,6 +260,39 @@ class EntityVOMapperTest {
 		assertEquals(expectedPojo, actual, "A real multi-instance attribute must round-trip as a flat list, not a list-of-singletons.");
 	}
 
+	@DisplayName("Reconstruct a multi-element list of objects from a real multi-instance Property (relatedParty-shaped entries).")
+	@Test
+	void testWithMultiInstancePropertyListOfObjects() throws Exception {
+		// Companion to testWithMultiInstancePropertyList, but for list items that
+		// are objects rather than plain values - the shape JavaObjectMapper now
+		// produces for e.g. a relatedParty-shaped extension property with two
+		// entries (see objectToAdditionalProperty). Each item legitimately
+		// carries its own synthetic datasetId; the round-trip must still yield a
+		// flat list of the raw object values, not a list-of-singletons.
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty("relatedParty", List.of(
+				Map.of("id", "urn:ngsi-ld:organization:1", "role", "customer"),
+				Map.of("id", "urn:ngsi-ld:organization:2", "role", "seller"))));
+
+		MyPojoWithUnmappedProperties expectedPojo = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		expectedPojo.setMyName("my-name");
+		expectedPojo.setUnmappedProperties(unmappedProperties);
+
+		String entityString = "{"
+				+ "\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\","
+				+ "\"id\":\"urn:ngsi-ld:my-pojo:the-entity\","
+				+ "\"type\":\"my-pojo\","
+				+ "\"name\":{\"value\":\"my-name\",\"type\":\"Property\"},"
+				+ "\"relatedParty\":["
+				+   "{\"type\":\"Property\",\"datasetId\":\"urn:ngsi-ld:dataset:list-item:0\",\"value\":{\"id\":\"urn:ngsi-ld:organization:1\",\"role\":\"customer\"}},"
+				+   "{\"type\":\"Property\",\"datasetId\":\"urn:ngsi-ld:dataset:list-item:1\",\"value\":{\"id\":\"urn:ngsi-ld:organization:2\",\"role\":\"seller\"}}"
+				+ "]}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithUnmappedProperties actual = entityVOMapper.fromEntityVO(theEntity, MyPojoWithUnmappedProperties.class).block();
+		assertEquals(expectedPojo, actual, "A real multi-instance attribute of objects must round-trip as a flat list of the raw objects.");
+	}
+
 	@DisplayName("Map entity with an unmapped property whose value is an empty list (preserves array shape).")
 	@Test
 	void testWithUnmappedPropertyContainingEmptyList() throws Exception {
