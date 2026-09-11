@@ -285,7 +285,13 @@ public class EntityVOMapper extends Mapper {
 			List<Map.Entry<String, Object>> entryList = new ArrayList<>(relationshipVO.getAdditionalProperties().entrySet()
 					.stream()
 					.map(entry -> {
-						if (entry.getValue() instanceof PropertyVO pvo) {
+						if (entry.getValue() == null) {
+							// Some brokers (observed with Scorpio) can return a sub-attribute
+							// as a literal JSON null, likely a @context expansion quirk on
+							// their side. Treat it as absent instead of failing the whole
+							// entity retrieval.
+							return new AbstractMap.SimpleEntry<>(entry.getKey(), null);
+						} else if (entry.getValue() instanceof PropertyVO pvo) {
 							return fromProperty(ReservedWordHandler.removeEscape(entry.getKey()), pvo);
 						} else if (entry.getValue() instanceof RelationshipVO rvo) {
 							return fromRelationship(ReservedWordHandler.removeEscape(entry.getKey()), rvo);
@@ -345,7 +351,13 @@ public class EntityVOMapper extends Mapper {
 			propertyVO.getAdditionalProperties().entrySet()
 					.stream()
 					.map(entry -> {
-						if (entry.getValue() instanceof PropertyVO pvo) {
+						if (entry.getValue() == null) {
+							// Some brokers (observed with Scorpio) can return a sub-attribute
+							// as a literal JSON null, likely a @context expansion quirk on
+							// their side. Treat it as absent instead of failing the whole
+							// entity retrieval.
+							return new AbstractMap.SimpleEntry<>(entry.getKey(), null);
+						} else if (entry.getValue() instanceof PropertyVO pvo) {
 							return fromProperty(ReservedWordHandler.removeEscape(entry.getKey()), pvo);
 						} else if (entry.getValue() instanceof RelationshipVO rvo) {
 							return fromRelationship(ReservedWordHandler.removeEscape(entry.getKey()), rvo);
