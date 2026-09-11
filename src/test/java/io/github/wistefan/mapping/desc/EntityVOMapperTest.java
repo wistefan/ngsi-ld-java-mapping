@@ -709,6 +709,43 @@ class EntityVOMapperTest {
 		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityFrom.class).block(), "The relationship target should have been created from its properties.");
 	}
 
+	@DisplayName("A legacy name should be used as a fallback when the primary name is absent.")
+	@Test
+	void mapFromPropertiesUsesLegacyNameAsFallback() {
+		EntityVO parentEntity = new EntityVO().id(URI.create("urn:ngsi-ld:complex-pojo:entity")).type("complex-pojo");
+		EntityVO subEntity = new EntityVO().id(URI.create("urn:ngsi-ld:sub-entity:entity")).type("sub-entity");
+		RelationshipVO subRel = new RelationshipVO()._object(subEntity.getId());
+		subRel.setAdditionalProperties("legacy-name", new PropertyVO().value("my-legacy-name"));
+		parentEntity.setAdditionalProperties("mySubProperty", subRel);
+
+		MySubPropertyEntity expectedSub = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:entity");
+		expectedSub.setMyName("my-legacy-name");
+		MyPojoWithSubEntityFrom expectedPojo = new MyPojoWithSubEntityFrom("urn:ngsi-ld:complex-pojo:entity");
+		expectedPojo.setMySubProperty(expectedSub);
+
+		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityFrom.class).block(),
+				"The legacy name should have been used, since the primary name was absent.");
+	}
+
+	@DisplayName("The primary name should win over a legacy name when both are present.")
+	@Test
+	void mapFromPropertiesPrefersPrimaryOverLegacyName() {
+		EntityVO parentEntity = new EntityVO().id(URI.create("urn:ngsi-ld:complex-pojo:entity")).type("complex-pojo");
+		EntityVO subEntity = new EntityVO().id(URI.create("urn:ngsi-ld:sub-entity:entity")).type("sub-entity");
+		RelationshipVO subRel = new RelationshipVO()._object(subEntity.getId());
+		subRel.setAdditionalProperties("name", new PropertyVO().value("my-other-name"));
+		subRel.setAdditionalProperties("legacy-name", new PropertyVO().value("should-not-be-used"));
+		parentEntity.setAdditionalProperties("mySubProperty", subRel);
+
+		MySubPropertyEntity expectedSub = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:entity");
+		expectedSub.setMyName("my-other-name");
+		MyPojoWithSubEntityFrom expectedPojo = new MyPojoWithSubEntityFrom("urn:ngsi-ld:complex-pojo:entity");
+		expectedPojo.setMySubProperty(expectedSub);
+
+		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityFrom.class).block(),
+				"The primary name should win when both are present.");
+	}
+
 
 	@DisplayName("The relationship targets should have been created from its properties.")
 	@Test

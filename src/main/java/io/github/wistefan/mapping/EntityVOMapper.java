@@ -573,6 +573,17 @@ public class EntityVOMapper extends Mapper {
 							optionalProperty = Optional.ofNullable(relationshipVO.getAdditionalProperties().get(field));
 						}
 
+						// fall back to any legacy name still present in already-stored data, e.g. after a rename
+						if (optionalProperty.isEmpty() && relationshipVO.getAdditionalProperties() != null) {
+							for (String legacyName : setterAnnotation.legacyNames()) {
+								AdditionalPropertyVO legacyValue = relationshipVO.getAdditionalProperties().get(legacyName);
+								if (legacyValue != null) {
+									optionalProperty = Optional.of(legacyValue);
+									break;
+								}
+							}
+						}
+
 						return optionalProperty.map(attributeValue ->
 								switch (setterAnnotation.value()) {
 									case PROPERTY, GEO_PROPERTY ->
