@@ -578,6 +578,30 @@ class EntityVOMapperTest {
 		assertEquals(expectedPojo, myPojoWithSubEntityEmbed, "The full pojo should be retrieved.");
 	}
 
+	@DisplayName("Map entity with an embedded property named after a newly added reserved word (unitCode).")
+	@Test
+	void testSubEntityEmbedMappingWithReservedWordProperty() throws JsonProcessingException {
+		MySubPropertyEntityEmbed expectedSubEntity = new MySubPropertyEntityEmbed("urn:ngsi-ld:sub-entity:the-sub-entity");
+		expectedSubEntity.setUnitCode("C62");
+		MyPojoWithSubEntityEmbed expectedPojo = new MyPojoWithSubEntityEmbed("urn:ngsi-ld:complex-pojo:the-test-pojo");
+		expectedPojo.setMySubProperty(expectedSubEntity);
+
+		String subEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"sub-entity\",\"name\":{\"type\":\"Property\",\"value\":\"myName\"}}";
+		EntityVO subEntity = OBJECT_MAPPER.readValue(subEntityString, EntityVO.class);
+
+		when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of(subEntity)));
+
+		// "tmfEscaped-unitCode" mirrors what the broker returns for an embedded Property named after
+		// the newly reserved "unitCode" word - it must keep the escape prefix on the wire (since it
+		// collides with PropertyVO's own field) and still resolve back to the plain "unitCode" setter.
+		String parentEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity\":{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"datasetId\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"role\":{\"type\":\"Property\",\"value\":\"Sub-Entity\"},\"tmfEscaped-unitCode\":{\"type\":\"Property\",\"value\":\"C62\"}}}";
+		EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
+
+		MyPojoWithSubEntityEmbed myPojoWithSubEntityEmbed = entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityEmbed.class).block();
+		assertEquals(expectedPojo, myPojoWithSubEntityEmbed,
+				"The embedded 'unitCode' property should have been resolved from its escaped wire name.");
+	}
+
 	@DisplayName("Map entity with all supported attribute types.")
 	@Test
 	void testListEntityMapping() throws JsonProcessingException {

@@ -573,6 +573,13 @@ public class EntityVOMapper extends Mapper {
 							optionalProperty = Optional.ofNullable(relationshipVO.getAdditionalProperties().get(field));
 						}
 
+						// the field name might collide with a reserved word (e.g. "unitCode"), in which case
+						// it stays escaped on the wire even inside a relationship - try that variant too.
+						if (optionalProperty.isEmpty() && relationshipVO.getAdditionalProperties() != null) {
+							optionalProperty = Optional.ofNullable(
+									relationshipVO.getAdditionalProperties().get(ReservedWordHandler.escapeReservedWords(field)));
+						}
+
 						// fall back to any legacy name still present in already-stored data, e.g. after a rename
 						if (optionalProperty.isEmpty() && relationshipVO.getAdditionalProperties() != null) {
 							for (String legacyName : setterAnnotation.legacyNames()) {
