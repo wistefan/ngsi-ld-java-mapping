@@ -1,16 +1,8 @@
 package io.github.wistefan.mapping;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.extern.log4j.Log4j;
 import lombok.extern.slf4j.Slf4j;
 
-import java.net.URI;
-import java.time.Instant;
-import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Handler for reserved words in NGSI-LD
@@ -21,7 +13,10 @@ public class ReservedWordHandler {
 	/**
 	 * Words that have a special meaning in NGSI-LD and are not allowed to be used in non-compliant ways.
 	 */
-	private static final List<String> RESERVED_WORDS = List.of("id", "@id", "value", "@value", "type", "@type", "context", "@context");
+	private static final List<String> RESERVED_WORDS = List.of(
+			"id", "@id", "value", "@value", "type", "@type", "context", "@context",
+			"datasetId", "expiresAt", "ngsildproof", "observedAt", "unitCode", "valueType",
+			"createdAt", "modifiedAt", "deletedAt", "instanceId");
 
 	/**
 	 * Subset of {@link #RESERVED_WORDS} whose JSON name (after unescape) would
@@ -35,7 +30,8 @@ public class ReservedWordHandler {
 	 * The unescape then happens later — in {@code EntityVOMapper} — when emitting
 	 * the user-facing keys.
 	 */
-	private static final List<String> VO_FIELD_COLLISIONS = List.of("value", "type", "id");
+	private static final List<String> VO_FIELD_COLLISIONS = List.of(
+			"value", "type", "id", "datasetId", "observedAt", "unitCode", "createdAt", "modifiedAt", "instanceId");
 
 	/**
 	 * Prefix to be used for escaping the reserved words.

@@ -659,14 +659,17 @@ public class JavaObjectMapper extends Mapper {
 			}
 			AttributeGetter attributeMapping = getAttributeGetter(method.getAnnotations()).orElseThrow(
 					() -> new MappingException(String.format(NO_MAPPING_DEFINED_FOR_METHOD_TEMPLATE, method)));
+			// escape so an embedded Property named after an NGSI-LD reserved word (e.g. "valueType")
+			// does not collide with the broker's own reserved meaning for that key.
+			String targetName = ReservedWordHandler.escapeReservedWords(attributeMapping.targetName());
 
 			if (isPlain(propertyObject)) {
 				PropertyVO propertyVO = new PropertyVO();
 				propertyVO.value(propertyObject);
-				return Optional.of(new AbstractMap.SimpleEntry<>(attributeMapping.targetName(), propertyVO));
+				return Optional.of(new AbstractMap.SimpleEntry<>(targetName, propertyVO));
 			} else if (propertyObject instanceof List) {
 				AdditionalPropertyVO additionalProperty = objectToAdditionalProperty(propertyObject);
-				return Optional.of(new AbstractMap.SimpleEntry<>(attributeMapping.targetName(), additionalProperty));
+				return Optional.of(new AbstractMap.SimpleEntry<>(targetName, additionalProperty));
 			} else {
 				Map<String, Object> propertyObjectMap = toMap(propertyObject);
 				if (propertyObjectMap.isEmpty()) {
@@ -676,7 +679,7 @@ public class JavaObjectMapper extends Mapper {
 				if (additionalProperty instanceof PropertyVO) {
 					((PropertyVO) additionalProperty).value(toEscapedMap(propertyObject));
 				}
-				return Optional.of(new AbstractMap.SimpleEntry<>(attributeMapping.targetName(), additionalProperty));
+				return Optional.of(new AbstractMap.SimpleEntry<>(targetName, additionalProperty));
 			}
 
 		} catch (IllegalAccessException | InvocationTargetException e) {
