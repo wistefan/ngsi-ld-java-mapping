@@ -79,8 +79,8 @@
         <version.io.micronaut.micronaut-jackson-databind>4.6.5</version.io.micronaut.micronaut-jackson-databind>
 
         <!-- json -->
-        <version.com.fasterxml.jackson.core.jackson-databind>2.18.0</version.com.fasterxml.jackson.core.jackson-databind>
-        <version.com.fasterxml.jackson.datatype.jackson-datatype-jsr310>2.18.0</version.com.fasterxml.jackson.datatype.jackson-datatype-jsr310>
+        <version.com.fasterxml.jackson.core.jackson-databind>2.18.10</version.com.fasterxml.jackson.core.jackson-databind>
+        <version.com.fasterxml.jackson.datatype.jackson-datatype-jsr310>2.18.10</version.com.fasterxml.jackson.datatype.jackson-datatype-jsr310>
 
         <!-- rx -->
         <version.io.reactivex.rxjava2.rxjava>2.2.21</version.io.reactivex.rxjava2.rxjava>
