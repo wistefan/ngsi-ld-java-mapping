@@ -29,17 +29,13 @@
         <url>https://github.com/wistefan/ngsi-ld-java-mapping/tree/main</url>
         <tag>HEAD</tag>
     </scm>
+
+
     <distributionManagement>
         <snapshotRepository>
-            <id>sonatype-nexus</id>
-            <name>Sonatype Nexus Snapshots</name>
-            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+            <id>sonatype.org</id>
+            <url>https://central.sonatype.com/repository/maven-snapshots/</url>
         </snapshotRepository>
-        <repository>
-            <id>sonatype-nexus</id>
-            <name>Nexus Release Repository</name>
-            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2</url>
-        </repository>
     </distributionManagement>
 
     <properties>
@@ -68,7 +64,7 @@
         <gpg.passphrase>pass</gpg.passphrase>
 
         <!-- lazy dev -->
-        <version.org.mapstruct>1.4.2.Final</version.org.mapstruct>
+        <version.org.mapstruct>1.6.2</version.org.mapstruct>
         <version.org.projectlombok>1.18.30</version.org.projectlombok>
 
         <!-- code gen -->
@@ -82,14 +78,12 @@
         <version.io.micronaut.micronaut-http-client>3.10.4</version.io.micronaut.micronaut-http-client>
 
         <!-- json -->
-        <version.com.fasterxml.jackson.core.jackson-databind>2.15.0
-        </version.com.fasterxml.jackson.core.jackson-databind>
-        <version.com.fasterxml.jackson.datatype.jackson-datatype-jsr310>2.15.0
-        </version.com.fasterxml.jackson.datatype.jackson-datatype-jsr310>
+        <version.com.fasterxml.jackson.core.jackson-databind>2.18.0</version.com.fasterxml.jackson.core.jackson-databind>
+        <version.com.fasterxml.jackson.datatype.jackson-datatype-jsr310>2.18.0</version.com.fasterxml.jackson.datatype.jackson-datatype-jsr310>
 
         <!-- rx -->
         <version.io.reactivex.rxjava2.rxjava>2.2.21</version.io.reactivex.rxjava2.rxjava>
-        <version.io.projectreactor.reactor-core>3.5.5</version.io.projectreactor.reactor-core>
+        <version.io.projectreactor.reactor-core>3.6.10</version.io.projectreactor.reactor-core>
         <version.javax.inject>1</version.javax.inject>
 
         <!-- logging -->
@@ -102,6 +96,7 @@
         <version.org.apache.maven.plugins.maven-gpg-plugin>3.0.1</version.org.apache.maven.plugins.maven-gpg-plugin>
         <version.org.sonatype.plugins.nexus-staging-maven-plugin>1.6.13
         </version.org.sonatype.plugins.nexus-staging-maven-plugin>
+        <version.org.sonatype.central.publishing-plugin>0.8.0</version.org.sonatype.central.publishing-plugin>
 
         <!-- test -->
         <version.org.junit.jupiter>5.9.3</version.org.junit.jupiter>
@@ -417,7 +412,7 @@
                                 <clientId>ngsi</clientId>
                                 <fullJavaUtil>true</fullJavaUtil>
                                 <useOptional>false</useOptional>
-                                <useGenericResponse>false</useGenericResponse>
+                                <useGenericResponse>true</useGenericResponse>
                                 <useLombokGenerated>true</useLombokGenerated>
                                 <introspected>true</introspected>
                                 <generateAliasAsModel>false</generateAliasAsModel>
@@ -458,7 +453,7 @@
                 </dependencies>
 
             </plugin>
-            <!-- add generated sources -->
+            <!-- add generated sources  -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>build-helper-maven-plugin</artifactId>
@@ -498,14 +493,14 @@
             <build>
                 <plugins>
                     <plugin>
-                        <groupId>org.sonatype.plugins</groupId>
-                        <artifactId>nexus-staging-maven-plugin</artifactId>
-                        <version>${version.org.sonatype.plugins.nexus-staging-maven-plugin}</version>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>${version.org.sonatype.central.publishing-plugin}</version>
                         <extensions>true</extensions>
                         <configuration>
-                            <serverId>sonatype-nexus</serverId>
-                            <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-                            <autoReleaseAfterClose>true</autoReleaseAfterClose>
+                            <publishingServerId>sonatype.org</publishingServerId>
+                            <autoPublish>true</autoPublish>
+                            <waitUntil>published</waitUntil>
                         </configuration>
                     </plugin>
                     <plugin>
