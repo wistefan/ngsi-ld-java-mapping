@@ -34,4 +34,12 @@ public @interface AttributeSetter {
 	 */
 	boolean fromProperties() default false;
 
+	/**
+	 * Alternate wire names to also look for when the primary {@link #targetName()} is absent from the
+	 * incoming data, checked in that order - the first match wins. Intended for backwards compatibility
+	 * when an attribute name is renamed, so data written under the old name can still be read. Never used
+	 * when serializing; writing always uses {@link #targetName()} only.
+	 */
+	String[] legacyNames() default {};
+
 }

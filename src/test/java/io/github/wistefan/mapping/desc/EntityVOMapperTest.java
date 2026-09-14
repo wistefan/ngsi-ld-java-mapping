@@ -1,7 +1,12 @@
 package io.github.wistefan.mapping.desc;
 
+import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.deser.BeanDeserializerBuilder;
+import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
+import com.fasterxml.jackson.databind.deser.SettableBeanProperty;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import io.github.wistefan.mapping.*;
 import io.github.wistefan.mapping.desc.pojos.*;
 import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithSubEntityWellKnown;
@@ -19,6 +24,8 @@ import reactor.core.publisher.Mono;
 
 import java.net.URI;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -29,405 +36,948 @@ import static org.mockito.Mockito.when;
 
 class EntityVOMapperTest {
 
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new EscapeCleaningJsonFactory());
 
-    private EntityVOMapper entityVOMapper;
-    private EntitiesRepository entitiesRepository = mock(EntitiesRepository.class);
+	private EntityVOMapper entityVOMapper;
+	private EntitiesRepository entitiesRepository = mock(EntitiesRepository.class);
 
-    private MappingProperties mappingProperties;
+	private MappingProperties mappingProperties;
 
-    @BeforeEach
-    public void setup() {
-        mappingProperties = new MappingProperties();
-        entityVOMapper = new EntityVOMapper(mappingProperties, OBJECT_MAPPER, entitiesRepository);
-        OBJECT_MAPPER
-                .addMixIn(AdditionalPropertyVO.class, AdditionalPropertyMixin.class);
-    }
+	@BeforeEach
+	public void setup() {
+
+		mappingProperties = new MappingProperties();
+		entityVOMapper = new EntityVOMapper(mappingProperties, OBJECT_MAPPER, entitiesRepository);
+		OBJECT_MAPPER
+				.addMixIn(AdditionalPropertyVO.class, AdditionalPropertyMixin.class);
+	}
+
+	@DisplayName("Map entity containing a relationship.")
+	@Test
+	void testSubEntityMapping() throws JsonProcessingException {
+		MySubPropertyEntity expectedSubEntity = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:the-sub-entity");
+		MyPojoWithSubEntity expectedPojo = new MyPojoWithSubEntity("urn:ngsi-ld:complex-pojo:the-test-pojo");
+		expectedPojo.setMySubProperty(expectedSubEntity);
+
 
-    @DisplayName("Map entity containing a relationship.")
-    @Test
-    void testSubEntityMapping() throws JsonProcessingException {
-        MySubPropertyEntity expectedSubEntity = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:the-sub-entity");
-        MyPojoWithSubEntity expectedPojo = new MyPojoWithSubEntity("urn:ngsi-ld:complex-pojo:the-test-pojo");
-        expectedPojo.setMySubProperty(expectedSubEntity);
-
-
-        String subEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"sub-entity\",\"name\":{\"type\":\"Property\",\"value\":\"myName\"}}";
-        EntityVO subEntity = OBJECT_MAPPER.readValue(subEntityString, EntityVO.class);
-
-        when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of(subEntity)));
-
-        String parentEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity\":{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"datasetId\":\"urn:ngsi-ld:sub-entity:the-sub-entity\"}}";
-        EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
-
-        MyPojoWithSubEntity myPojoWithSubEntity = entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntity.class).block();
-        assertEquals(expectedPojo, myPojoWithSubEntity, "The full pojo should be retrieved.");
-    }
-
-    @DisplayName("Map entity containing a relationship that could not be resolved with strict-mapping disabled.")
-    @Test
-    void testSubEntityMappingNoStrict() throws JsonProcessingException {
-        mappingProperties.setStrictRelationships(false);
-        MySubPropertyEntity expectedSubEntity = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:the-sub-entity");
-        MyPojoWithSubEntity expectedPojo = new MyPojoWithSubEntity("urn:ngsi-ld:complex-pojo:the-test-pojo");
-        expectedPojo.setMySubProperty(expectedSubEntity);
-
-        when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of()));
-
-        String parentEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity\":{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"datasetId\":\"urn:ngsi-ld:sub-entity:the-sub-entity\"}}";
-        EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
-
-        MyPojoWithSubEntity myPojoWithSubEntity = entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntity.class).block();
-        assertEquals(expectedPojo, myPojoWithSubEntity, "The full pojo should be retrieved.");
-    }
-
-    @DisplayName("Fail entity containing a relationship that could not be resolved with strict-mapping enabled.")
-    @Test
-    void testSubEntityMappingStrict() throws JsonProcessingException {
-        mappingProperties.setStrictRelationships(true);
-        when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of()));
-
-        String parentEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity\":{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"datasetId\":\"urn:ngsi-ld:sub-entity:the-sub-entity\"}}";
-        EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
-
-        assertThrows(MappingException.class, () -> entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntity.class).block(), "For strict-mapping, an exception should be thrown.");
-    }
-
-
-    @DisplayName("Map entity containing a relationship with embedded values.")
-    @Test
-    void testSubEntityEmbedMapping() throws JsonProcessingException {
-        MySubPropertyEntityEmbed expectedSubEntity = new MySubPropertyEntityEmbed("urn:ngsi-ld:sub-entity:the-sub-entity");
-        MyPojoWithSubEntityEmbed expectedPojo = new MyPojoWithSubEntityEmbed("urn:ngsi-ld:complex-pojo:the-test-pojo");
-        expectedPojo.setMySubProperty(expectedSubEntity);
-
-        String subEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"sub-entity\",\"name\":{\"type\":\"Property\",\"value\":\"myName\"}}";
-        EntityVO subEntity = OBJECT_MAPPER.readValue(subEntityString, EntityVO.class);
-
-        when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of(subEntity)));
-
-        String parentEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity\":{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"datasetId\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"role\":{\"type\":\"Property\",\"value\":\"Sub-Entity\"}}}";
-        EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
-
-        MyPojoWithSubEntityEmbed myPojoWithSubEntityEmbed = entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityEmbed.class).block();
-        assertEquals(expectedPojo, myPojoWithSubEntityEmbed, "The full pojo should be retrieved.");
-    }
-
-    @DisplayName("Map entity with all supported attribute types.")
-    @Test
-    void testListEntityMapping() throws JsonProcessingException {
-        PropertyListPojo propertyListPojo = new PropertyListPojo("urn:ngsi-ld:list-pojo:the-pojo");
-
-        MySubPropertyEntity subEntity1 = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:the-sub-entity-1");
-        MySubPropertyEntity subEntity2 = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:the-sub-entity-2");
-
-        MySubProperty property1 = new MySubProperty();
-        property1.setPropertyName("p-1");
-        MySubProperty property2 = new MySubProperty();
-        property2.setPropertyName("p-2");
-
-        propertyListPojo.setProperty(property1);
-        propertyListPojo.setRelationShip(subEntity1);
-        propertyListPojo.setPropertyList(List.of(property1, property2));
-        propertyListPojo.setRelationshipList(List.of(subEntity1, subEntity2));
-
-        String subEntity1String = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:sub-entity:the-sub-entity-1\",\"type\":\"sub-entity\",\"name\":{\"type\":\"Property\",\"value\":\"myName\"}}";
-        String subEntity2String = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:sub-entity:the-sub-entity-2\",\"type\":\"sub-entity\",\"name\":{\"type\":\"Property\",\"value\":\"myName\"}}";
-
-        EntityVO parsedSubEntity1 = OBJECT_MAPPER.readValue(subEntity1String, EntityVO.class);
-        EntityVO parsedSubEntity2 = OBJECT_MAPPER.readValue(subEntity2String, EntityVO.class);
-
-        when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of(parsedSubEntity1, parsedSubEntity2)));
-
-        String parentEntityString = "{\n" +
-                "\t\"@context\": \"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\n" +
-                "\t\"id\": \"urn:ngsi-ld:list-pojo:the-pojo\",\n" +
-                "\t\"type\": \"list-pojo\",\n" +
-                "\t\"mySubProperty\": {\n" +
-                "\t  \"value\": {\n" +
-                "\t\t\"propertyName\": \"p-1\"\n" +
-                "\t  },\n" +
-                "\t  \"type\": \"Property\"\n" +
-                "\t},\n" +
-                "\t\"myRelationship\": {\n" +
-                "\t\t\"object\": \"urn:ngsi-ld:sub-entity:the-sub-entity-1\",\n" +
-                "\t\t\"type\": \"Relationship\",\n" +
-                "\t\t\"datasetId\": \"urn:ngsi-ld:sub-entity:the-sub-entity-1\"\n" +
-                "\t},\n" +
-                "\t\"mySubPropertyList\": [\n" +
-                "\t \t{\n" +
-                "\t\t \"value\": {\n" +
-                "\t\t\t\"propertyName\": \"p-1\"\n" +
-                "\t\t  },\n" +
-                "\t  \t\"type\": \"Property\"\n" +
-                "\t\t}, \n" +
-                "\t  \t{\n" +
-                "\t\t  \"value\": {\n" +
-                "\t\t\t\"propertyName\": \"p-2\"\n" +
-                "\t\t  },\n" +
-                "\t\t  \"type\": \"Property\"\n" +
-                "\t\t}\n" +
-                "\t],\n" +
-                "\t\"myRelationshipList\": [\n" +
-                "\t \t{\n" +
-                "\t\t  \"object\": \"urn:ngsi-ld:sub-entity:the-sub-entity-1\",\n" +
-                "\t\t  \"type\": \"Relationship\",\n" +
-                "\t\t  \"datasetId\": \"urn:ngsi-ld:sub-entity:the-sub-entity-1\"\n" +
-                "\t\t}, \n" +
-                "\t  \t{\n" +
-                "\t\t  \"object\": \"urn:ngsi-ld:sub-entity:the-sub-entity-2\",\n" +
-                "\t\t  \"type\": \"Relationship\",\n" +
-                "\t\t  \"datasetId\": \"urn:ngsi-ld:sub-entity:the-sub-entity-2\"\n" +
-                "\t\t}\n" +
-                "\t]\n" +
-                "}";
-        EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
-
-        PropertyListPojo mappedPojo = entityVOMapper.fromEntityVO(parentEntity, PropertyListPojo.class).block();
-        assertEquals(propertyListPojo, mappedPojo, "The full pojo should be retrieved.");
-    }
-
-    @DisplayName("Only mapping to classes with mapping enabled is supported.")
-    @Test
-    void failWithoutMappingEnabled() {
-        assertThrows(MappingException.class, () -> entityVOMapper.fromEntityVO(new EntityVO(), Object.class).block(), "Only mapping to classes with mapping enabled is supported.");
-    }
-
-    @DisplayName("Only mapping to matching classes is supported.")
-    @Test
-    void failWithoutMatchingClass() {
-        EntityVO myEntity = new EntityVO().type("my-type");
-        assertThrows(MappingException.class, () -> entityVOMapper.fromEntityVO(myEntity, MyPojo.class).block(), "Only mapping to matching classes is supported.");
-    }
-
-    @DisplayName("The target classes should provide a string constructor.")
-    @Test
-    void failWithoutWrongConstructor() {
-        when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of()));
-
-        EntityVO myEntity = new EntityVO().type("my-pojo").id(URI.create("urn:ngsi-ld:pojo:pojo"));
-        assertThrows(MappingException.class, () -> entityVOMapper.fromEntityVO(myEntity, MyPojoWithWrongConstructor.class).block(), "The target classes should provide a string constructor.");
-    }
-
-    @DisplayName("Unmapped properties should be ignored.")
-    @Test
-    void ignoreUnmappedProperties() {
-        MySubPropertyEntity mySubPropertyEntity = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:entity");
-        mySubPropertyEntity.setMyName("non-ignore");
-        EntityVO entityVO = new EntityVO().id(URI.create("urn:ngsi-ld:sub-entity:entity")).type("sub-entity");
-        entityVO.setAdditionalProperties("non-prop", new PropertyVO().value("ignore"));
-        entityVO.setAdditionalProperties("name", new PropertyVO().value("non-ignore"));
-        assertEquals(mySubPropertyEntity, entityVOMapper.fromEntityVO(entityVO, MySubPropertyEntity.class).block(), "The non-prop should be ignored.");
-    }
-
-    @DisplayName("If the constructor is broken, nothing should be mapped.")
-    @Test
-    void failOnBrokenConstructor() {
-        EntityVO entityVO = new EntityVO().id(URI.create("urn:ngsi-ld:throwing-pojo:id")).type("throwing-pojo");
-        assertThrows(MappingException.class, () -> entityVOMapper.fromEntityVO(entityVO, MyThrowingConstructor.class).block(), "If the constructor is broken, nothing should be mapped.");
-    }
-
-    @DisplayName("The relationship target should have been created from its properties.")
-    @Test
-    void mapFromProperties() {
-        EntityVO parentEntity = new EntityVO().id(URI.create("urn:ngsi-ld:complex-pojo:entity")).type("complex-pojo");
-        EntityVO subEntity = new EntityVO().id(URI.create("urn:ngsi-ld:sub-entity:entity")).type("sub-entity");
-        RelationshipVO subRel = new RelationshipVO()._object(subEntity.getId());
-        subRel.setAdditionalProperties("name", new PropertyVO().value("my-other-name"));
-        parentEntity.setAdditionalProperties("mySubProperty", subRel);
-
-        MySubPropertyEntity expectedSub = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:entity");
-        expectedSub.setMyName("my-other-name");
-        MyPojoWithSubEntityFrom expectedPojo = new MyPojoWithSubEntityFrom("urn:ngsi-ld:complex-pojo:entity");
-        expectedPojo.setMySubProperty(expectedSub);
-
-        assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityFrom.class).block(), "The relationship target should have been created from its properties.");
-    }
-
-
-    @DisplayName("The relationship targets should have been created from its properties.")
-    @Test
-    void mapListFromProperties() {
-        EntityVO parentEntity = new EntityVO().id(URI.create("urn:ngsi-ld:complex-pojo:entity")).type("complex-pojo");
-        EntityVO subEntity1 = new EntityVO().id(URI.create("urn:ngsi-ld:sub-entity:entity-1")).type("sub-entity");
-        EntityVO subEntity2 = new EntityVO().id(URI.create("urn:ngsi-ld:sub-entity:entity-2")).type("sub-entity");
-        RelationshipVO subRel1 = new RelationshipVO()._object(subEntity1.getId());
-        RelationshipVO subRel2 = new RelationshipVO()._object(subEntity2.getId());
-
-        subRel1.setAdditionalProperties("name", new PropertyVO().value("sub-entity-1"));
-        subRel2.setAdditionalProperties("name", new PropertyVO().value("sub-entity-2"));
-        RelationshipListVO relationshipVOS = new RelationshipListVO();
-        relationshipVOS.add(subRel1);
-        relationshipVOS.add(subRel2);
-        parentEntity.setAdditionalProperties("mySubProperty", relationshipVOS);
-
-        MySubPropertyEntity expectedSub1 = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:entity-1");
-        expectedSub1.setMyName("sub-entity-1");
-        MySubPropertyEntity expectedSub2 = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:entity-2");
-        expectedSub2.setMyName("sub-entity-2");
-        MyPojoWithSubEntityListFrom expectedPojo = new MyPojoWithSubEntityListFrom("urn:ngsi-ld:complex-pojo:entity");
-        expectedPojo.setMySubProperty(List.of(expectedSub1, expectedSub2));
-
-        assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityListFrom.class).block(), "The relationship targets should have been created from its properties.");
-    }
-
-    @DisplayName("If the setter is broken, nothing should be constructed.")
-    @Test
-    void failWithThrowingSetter() {
-        EntityVO entity = new EntityVO().id(URI.create("urn:ngsi-ld:my-pojo:entity")).type("my-pojo");
-        assertThrows(MappingException.class, () -> entityVOMapper.fromEntityVO(entity, MySetterThrowingPojo.class).block(), "If the setter is broken, nothing should be constructed.");
-    }
-
-    @DisplayName("Well known properties should properly be mapped.")
-    @Test
-    void mapWithWellKnown() {
-        EntityVO entityVO = new EntityVO().id(URI.create("urn:ngsi-ld:complex-pojo:entity")).type("complex-pojo");
-        EntityVO subEntity = new EntityVO().id(URI.create("urn:ngsi-ld:sub-entity:entity")).type("sub-entity");
-        when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of(subEntity)));
-
-        RelationshipVO subRel = new RelationshipVO()
-                ._object(subEntity.getId())
-                .observedAt(Instant.MAX)
-                .createdAt(Instant.MAX)
-                .modifiedAt(Instant.MAX)
-                .datasetId(subEntity.getId())
-                .instanceId(URI.create("id"));
-        entityVO.setAdditionalProperties("mySubProperty", subRel);
-
-        MySubPropertyEntityWithWellKnown mySubPropertyEntityWithWellKnown = new MySubPropertyEntityWithWellKnown("urn:ngsi-ld:sub-entity:entity");
-        mySubPropertyEntityWithWellKnown.setDatasetId("urn:ngsi-ld:sub-entity:entity");
-        mySubPropertyEntityWithWellKnown.setInstanceId("id");
-        mySubPropertyEntityWithWellKnown.setCreatedAt(Instant.MAX);
-        mySubPropertyEntityWithWellKnown.setModifiedAt(Instant.MAX);
-        mySubPropertyEntityWithWellKnown.setObservedAt(Instant.MAX);
-
-        MyPojoWithSubEntityWellKnown myPojoWithSubEntityWellKnown = new MyPojoWithSubEntityWellKnown("urn:ngsi-ld:complex-pojo:entity");
-        myPojoWithSubEntityWellKnown.setMySubProperty(mySubPropertyEntityWithWellKnown);
-
-        assertEquals(myPojoWithSubEntityWellKnown, entityVOMapper.fromEntityVO(entityVO, MyPojoWithSubEntityWellKnown.class).block(), "Well known properties should properly be mapped.");
-    }
-
-    @Test
-    void testSubPropertyWorkaround() {
-        MyPojoWithListOfSubProperty myPojoWithListOfSubProperty = new MyPojoWithListOfSubProperty("urn:ngsi-ld:complex-pojo:entity");
-        MySubProperty prop1 = new MySubProperty();
-        MySubProperty prop2 = new MySubProperty();
-        myPojoWithListOfSubProperty.setMySubProperties(List.of(prop1, prop2));
-        EntityVO entityVO = new EntityVO().id(URI.create("urn:ngsi-ld:complex-pojo:entity")).type("complex-pojo");
-        PropertyVO propertyVO = new PropertyVO().value(List.of(prop1, prop2));
-
-        entityVO.setAdditionalProperties("mySubProperty", propertyVO);
-
-        assertEquals(myPojoWithListOfSubProperty, entityVOMapper.fromEntityVO(entityVO, MyPojoWithListOfSubProperty.class).block(), "The sub property should be mapped to a list.");
-    }
-
-    @Test
-    public void testConvertEntityToMap() {
-        MySimplePojo pojo = new MySimplePojo();
-        pojo.setMyName("Some");
-        pojo.setNumbers(List.of());
-
-        assertEquals(
-                Map.ofEntries(
-                        Map.entry("myName", pojo.getMyName()),
-                        Map.entry("numbers", pojo.getNumbers())
-                ),
-                entityVOMapper.convertEntityToMap(pojo));
-    }
-
-    @Test
-    void testReadingNotificationFromJson() throws JsonProcessingException {
-        String json = """
-                {
-                  "id": "urn:ngsi-ld:Notification:4233e3ca-50c3-11ee-8433-0a580a826912",
-                  "type": "Notification",
-                  "subscriptionId": "urn:ngsi-ld:subscription:567f4788-50bf-11ee-94e9-0a580a826911",
-                  "notifiedAt": "2023-09-11T16:50:05.456Z",
-                  "data": [
-                    {
-                      "id": "urn:ngsi-ld:product:4d0964a4-2341-4676-a551-de5115ccf98d",
-                      "type": "product",
-                      "deletedAt": "2023-09-11T16:50:05.456Z"
-                    }
-                  ]
-                }""";
-        NotificationVO notificationVO = entityVOMapper.readNotificationFromJSON(json);
-
-        assertNotNull(notificationVO);
-        assertEquals("Notification", notificationVO.getType());
-    }
-
-    @DisplayName("Query mapping")
-    @Test
-    void testQueryMapping() {
-        MySubscriptionPojo myPojo = createSubscription();
-
-        assertEquals(myPojo.getQ(), entityVOMapper.toSubscriptionVO(myPojo).getQ(),
-                "The pojo should have the same query");
-    }
-
-    @DisplayName("Notification endpoint mapping")
-    @Test
-    void testNotificationEndpointMapping() {
-        MySubscriptionPojo myPojo = createSubscription();
-
-        assertEquals(myPojo.getNotification().getEndpoint().getUri(), entityVOMapper.toSubscriptionVO(myPojo).getNotification().getEndpoint().getUri(),
-                "The pojo should have the same notification endpoint");
-    }
-
-    @DisplayName("Map entity with duplicate relationship")
-    @Test
-    void testDuplicateRelationship() throws Exception {
-        MySubPropertyEntity expectedSubEntity = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:the-sub-entity");
-        MyPojoWithSubEntityList expectedPojo = new MyPojoWithSubEntityList("urn:ngsi-ld:complex-pojo:the-test-pojo");
-        expectedPojo.setMySubPropertyList(List.of(expectedSubEntity, expectedSubEntity));
-
-        String subEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"sub-entity\",\"name\":{\"type\":\"Property\",\"value\":\"myName\"}}";
-        EntityVO subEntity = OBJECT_MAPPER.readValue(subEntityString, EntityVO.class);
-
-        when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of(subEntity, subEntity)));
-
-        String parentEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity-list\":[{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"datasetId\":\"urn:ngsi-ld:sub-entity:the-sub-entity\"},{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"datasetId\":\"urn:ngsi-ld:sub-entity:the-sub-entity\"}]}";
-        EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
-
-        MyPojoWithSubEntityList myPojoWithSubEntity = entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityList.class).block();
-        assertEquals(expectedPojo, myPojoWithSubEntity, "The full pojo should be retrieved.");
-    }
-
-    @DisplayName("*****Test mapping geo entities*****")
-    @Test
-    void testMappingGeoEntities() throws JsonProcessingException {
-        MyPojoWithLocation expectedPojoWithLocation = new MyPojoWithLocation("urn:ngsi-ld:complex-pojo:the-test-pojo");
-        MyLocation location = new MyLocation();
-        double[] coordinates =  new double[]{0.0, 0.0};
-        location.setCoordinates(coordinates);
-        expectedPojoWithLocation.setMyLocation(location);
-        String entityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"location-pojo\",\"myLocation\": { \"type\": \"GeoProperty\",    \"value\": {      \"type\": \"Point\",      \"coordinates\": [0,0]    }  }}";
-        EntityVO parsedEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
-        //GeoPropertyVO
-        MyPojoWithLocation myPojoWithLocation = entityVOMapper.fromEntityVO(parsedEntity, MyPojoWithLocation.class).block();
-        assertEquals(expectedPojoWithLocation.getId(), myPojoWithLocation.getId(), "GeoEntities can be mapped to their Java Objects");
-    }
-
-    private MySubscriptionPojo createSubscription() {
-        MySubscriptionPojo myPojo = new MySubscriptionPojo("urn:ngsi-ld:my-pojo:the-test-pojo");
-        myPojo.setQ("eventType=custom");
-        myPojo.setNotification(createNotification());
-
-        return myPojo;
-    }
-
-    private MyNotificationParamsEndpointProperty createEndpoint() {
-        MyNotificationParamsEndpointProperty endpointProperty = new MyNotificationParamsEndpointProperty();
-        endpointProperty.setUri(URI.create("test.com"));
-        endpointProperty.setAccept("application/ld+json");
-        return endpointProperty;
-    }
-
-    private MyNotificationParamsProperty createNotification() {
-        MyNotificationParamsProperty notificationParamsProperty = new MyNotificationParamsProperty();
-        notificationParamsProperty.setEndpoint(createEndpoint());
-        notificationParamsProperty.setFormat("keyValues");
-        return notificationParamsProperty;
-    }
+		String subEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"sub-entity\",\"name\":{\"type\":\"Property\",\"value\":\"myName\"}}";
+		EntityVO subEntity = OBJECT_MAPPER.readValue(subEntityString, EntityVO.class);
+
+		when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of(subEntity)));
+
+		String parentEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity\":{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"datasetId\":\"urn:ngsi-ld:sub-entity:the-sub-entity\"}}";
+		EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
+
+		MyPojoWithSubEntity myPojoWithSubEntity = entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntity.class).block();
+		assertEquals(expectedPojo, myPojoWithSubEntity, "The full pojo should be retrieved.");
+	}
+
+	@DisplayName("Map an entity with not explicitly mapped properties.")
+	@Test
+	void testWithUnmappedProperties() throws Exception {
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty("test", "test"));
+
+		MyPojoWithUnmappedProperties expectedPojo = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		expectedPojo.setMyName("my-name");
+		expectedPojo.setUnmappedProperties(unmappedProperties);
+
+		String entityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"test\":{\"value\":\"test\",\"type\":\"Property\"},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = entityVOMapper.fromEntityVO(theEntity, MyPojoWithUnmappedProperties.class).block();
+		assertEquals(expectedPojo, myPojoWithUnmappedProperties, "The full pojo should be returned.");
+	}
+
+	@DisplayName("Map an entity with a not explicitly mapped property list.")
+	@Test
+	void testWithUnmappedPropertiesList() throws Exception {
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty("test", List.of(1, 2, 3)));
+
+		MyPojoWithUnmappedProperties expectedPojo = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		expectedPojo.setMyName("my-name");
+		expectedPojo.setUnmappedProperties(unmappedProperties);
+
+		String entityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"test\":{\"value\":[1,2,3],\"type\":\"Property\"},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = entityVOMapper.fromEntityVO(theEntity, MyPojoWithUnmappedProperties.class).block();
+		assertEquals(expectedPojo, myPojoWithUnmappedProperties, "The full pojo should be returned.");
+	}
+
+	@DisplayName("Map an entity with a not explicitly mapped property list containing a reserved word.")
+	@Test
+	void testWithUnmappedPropertiesListContainingReservedWord() throws Exception {
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty("@value", List.of(1, 2, 3)));
+
+		MyPojoWithUnmappedProperties expectedPojo = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		expectedPojo.setMyName("my-name");
+		expectedPojo.setUnmappedProperties(unmappedProperties);
+
+		String entityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"tmfEscaped-@value\":{\"value\":[1,2,3],\"type\":\"Property\"},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = entityVOMapper.fromEntityVO(theEntity, MyPojoWithUnmappedProperties.class).block();
+		assertEquals(expectedPojo, myPojoWithUnmappedProperties, "The full pojo should be returned.");
+	}
+
+	@DisplayName("Map an entity with multiple not explicitly mapped properties.")
+	@Test
+	void testWithMultipleUnmappedProperties() throws Exception {
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty("other", "property"));
+		unmappedProperties.add(new UnmappedProperty("test", List.of(1, 2, 3)));
+
+		MyPojoWithUnmappedProperties expectedPojo = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		expectedPojo.setMyName("my-name");
+		expectedPojo.setUnmappedProperties(unmappedProperties);
+
+		String entityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"other\":{\"value\":\"property\",\"type\":\"Property\"},\"test\":{\"value\":[1,2,3],\"type\":\"Property\"},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = entityVOMapper.fromEntityVO(theEntity, MyPojoWithUnmappedProperties.class).block();
+		assertEquals(OBJECT_MAPPER.writeValueAsString(expectedPojo), OBJECT_MAPPER.writeValueAsString(myPojoWithUnmappedProperties), "The full pojo should be returned.");
+	}
+
+	@DisplayName("Map entity with an unmapped property, containing a relationship.")
+	@Test
+	void testWithUnmappedRelationship() throws Exception {
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty("test", "test"));
+		unmappedProperties.add(new UnmappedProperty("complex", Map.of("something", "other", "id", "urn:ngsi-ld:entity:id")));
+
+		MyPojoWithUnmappedProperties expectedPojo = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		expectedPojo.setMyName("my-name");
+		expectedPojo.setUnmappedProperties(unmappedProperties);
+
+		String entityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"test\":{\"value\":\"test\",\"type\":\"Property\"},\"complex\":{\"object\":\"urn:ngsi-ld:entity:id\",\"type\":\"Relationship\",\"something\":{\"value\":\"other\",\"type\":\"Property\"}},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = entityVOMapper.fromEntityVO(theEntity, MyPojoWithUnmappedProperties.class).block();
+		assertEquals(expectedPojo, myPojoWithUnmappedProperties, "The full pojo should be returned.");
+	}
+
+	@DisplayName("Map entity with a complex unmapped property.")
+	@Test
+	void testWithComplexUnmappedProperties() throws Exception {
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty("test", "test"));
+		unmappedProperties.add(new UnmappedProperty("complex", Map.of("something", "something", "number", 1)));
+
+		MyPojoWithUnmappedProperties expectedPojo = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		expectedPojo.setMyName("my-name");
+		expectedPojo.setUnmappedProperties(unmappedProperties);
+
+		String entityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"test\":{\"value\":\"test\",\"type\":\"Property\"},\"complex\":{\"value\":{\"number\":{\"value\":1,\"type\":\"Property\"},\"something\":{\"value\":\"something\",\"type\":\"Property\"}},\"type\":\"Property\",\"number\":{\"value\":1,\"type\":\"Property\"},\"something\":{\"value\":\"something\",\"type\":\"Property\"}},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = entityVOMapper.fromEntityVO(theEntity, MyPojoWithUnmappedProperties.class).block();
+		assertEquals(expectedPojo, myPojoWithUnmappedProperties, "The full pojo should be returned.");
+	}
+
+	@DisplayName("Map entity with a deep unmapped property.")
+	@Test
+	void testWithDeepUnmappedProperties() throws Exception {
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty("test", "test"));
+		unmappedProperties.add(new UnmappedProperty("complex", Map.of("number", 1, "deep", Map.of("something", "deep"))));
+
+		MyPojoWithUnmappedProperties expectedPojo = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		expectedPojo.setMyName("my-name");
+		expectedPojo.setUnmappedProperties(unmappedProperties);
+
+		String entityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"test\":{\"value\":\"test\",\"type\":\"Property\"},\"complex\":{\"value\":{\"number\":{\"value\":1,\"type\":\"Property\"},\"deep\":{\"value\":{\"something\":{\"value\":\"deep\",\"type\":\"Property\"}},\"type\":\"Property\",\"something\":{\"value\":\"deep\",\"type\":\"Property\"}}},\"type\":\"Property\",\"number\":{\"value\":1,\"type\":\"Property\"},\"deep\":{\"value\":{\"something\":{\"value\":\"deep\",\"type\":\"Property\"}},\"type\":\"Property\",\"something\":{\"value\":\"deep\",\"type\":\"Property\"}}},\"name\":{\"value\":\"my-name\",\"type\":\"Property\"}}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = entityVOMapper.fromEntityVO(theEntity, MyPojoWithUnmappedProperties.class).block();
+		assertEquals(expectedPojo, myPojoWithUnmappedProperties, "The full pojo should be returned.");
+	}
+
+	@DisplayName("Reconstruct a single-element list from a Property the broker compacted (recognises the synthetic list-item datasetId).")
+	@Test
+	void testWithSingleElementListCollapsedByBroker() throws Exception {
+		// Plain-list values are persisted as a multi-instance Property
+		// (PropertyListVO) with one PropertyVO per item, each carrying a
+		// synthetic datasetId prefixed by LIST_ITEM_DATASET_ID_PREFIX.
+		// NGSI-LD brokers MUST preserve multi-instance arrays — but for an
+		// array of one, some brokers (e.g. Scorpio) drop the array wrapper
+		// and return a single Property. We detect that case via the
+		// datasetId prefix and wrap the scalar back into a single-element
+		// list on the way out.
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty("dependsOn", List.of("step-cache")));
+
+		MyPojoWithUnmappedProperties expectedPojo = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		expectedPojo.setMyName("my-name");
+		expectedPojo.setUnmappedProperties(unmappedProperties);
+
+		// Wire format mirrors what Scorpio returns after compacting a
+		// single-instance multi-attribute back to one Property: the
+		// datasetId stays on the Property, the array wrapper is gone.
+		String entityString = "{"
+				+ "\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\","
+				+ "\"id\":\"urn:ngsi-ld:my-pojo:the-entity\","
+				+ "\"type\":\"my-pojo\","
+				+ "\"name\":{\"value\":\"my-name\",\"type\":\"Property\"},"
+				+ "\"dependsOn\":{\"type\":\"Property\",\"datasetId\":\"urn:ngsi-ld:dataset:list-item:0\",\"value\":\"step-cache\"}"
+				+ "}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = entityVOMapper.fromEntityVO(theEntity, MyPojoWithUnmappedProperties.class).block();
+		assertEquals(expectedPojo, myPojoWithUnmappedProperties, "A Property bearing the synthetic list-item datasetId must round-trip as a single-element list.");
+	}
+
+	@DisplayName("Reconstruct a multi-element list from a real multi-instance Property (does NOT wrap each item).")
+	@Test
+	void testWithMultiInstancePropertyList() throws Exception {
+		// Companion case to testWithSingleElementListCollapsedByBroker.
+		// When the wire format carries a TRUE multi-instance attribute (an array of
+		// PropertyVO, one per item), every item legitimately has a datasetId
+		// because NGSI-LD requires it for multi-instance attributes. The
+		// "datasetId-means-singleton-compacted" heuristic must NOT fire here:
+		// otherwise the round-trip turns ["a", "b"] into [["a"], ["b"]].
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty("extensionArray", List.of("a", "b")));
+
+		MyPojoWithUnmappedProperties expectedPojo = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		expectedPojo.setMyName("my-name");
+		expectedPojo.setUnmappedProperties(unmappedProperties);
+
+		String entityString = "{"
+				+ "\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\","
+				+ "\"id\":\"urn:ngsi-ld:my-pojo:the-entity\","
+				+ "\"type\":\"my-pojo\","
+				+ "\"name\":{\"value\":\"my-name\",\"type\":\"Property\"},"
+				+ "\"extensionArray\":["
+				+   "{\"type\":\"Property\",\"datasetId\":\"urn:ngsi-ld:dataset:list-item:0\",\"value\":\"a\"},"
+				+   "{\"type\":\"Property\",\"datasetId\":\"urn:ngsi-ld:dataset:list-item:1\",\"value\":\"b\"}"
+				+ "]}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithUnmappedProperties actual = entityVOMapper.fromEntityVO(theEntity, MyPojoWithUnmappedProperties.class).block();
+		assertEquals(expectedPojo, actual, "A real multi-instance attribute must round-trip as a flat list, not a list-of-singletons.");
+	}
+
+	@DisplayName("Reconstruct a multi-element list of objects from a real multi-instance Property (relatedParty-shaped entries).")
+	@Test
+	void testWithMultiInstancePropertyListOfObjects() throws Exception {
+		// Companion to testWithMultiInstancePropertyList, but for list items that
+		// are objects rather than plain values - the shape JavaObjectMapper now
+		// produces for e.g. a relatedParty-shaped extension property with two
+		// entries (see objectToAdditionalProperty). Each item legitimately
+		// carries its own synthetic datasetId; the round-trip must still yield a
+		// flat list of the raw object values, not a list-of-singletons.
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty("relatedParty", List.of(
+				Map.of("id", "urn:ngsi-ld:organization:1", "role", "customer"),
+				Map.of("id", "urn:ngsi-ld:organization:2", "role", "seller"))));
+
+		MyPojoWithUnmappedProperties expectedPojo = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		expectedPojo.setMyName("my-name");
+		expectedPojo.setUnmappedProperties(unmappedProperties);
+
+		String entityString = "{"
+				+ "\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\","
+				+ "\"id\":\"urn:ngsi-ld:my-pojo:the-entity\","
+				+ "\"type\":\"my-pojo\","
+				+ "\"name\":{\"value\":\"my-name\",\"type\":\"Property\"},"
+				+ "\"relatedParty\":["
+				+   "{\"type\":\"Property\",\"datasetId\":\"urn:ngsi-ld:dataset:list-item:0\",\"value\":{\"id\":\"urn:ngsi-ld:organization:1\",\"role\":\"customer\"}},"
+				+   "{\"type\":\"Property\",\"datasetId\":\"urn:ngsi-ld:dataset:list-item:1\",\"value\":{\"id\":\"urn:ngsi-ld:organization:2\",\"role\":\"seller\"}}"
+				+ "]}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithUnmappedProperties actual = entityVOMapper.fromEntityVO(theEntity, MyPojoWithUnmappedProperties.class).block();
+		assertEquals(expectedPojo, actual, "A real multi-instance attribute of objects must round-trip as a flat list of the raw objects.");
+	}
+
+	@DisplayName("Map entity with an unmapped property whose value is an empty list (preserves array shape).")
+	@Test
+	void testWithUnmappedPropertyContainingEmptyList() throws Exception {
+		// Reproduces a bug on the POST side: an empty List used to fall through
+		// the list-handling branch (gated on `!isEmpty()`) and end up in the Map
+		// branch, where toMap(emptyList) returns Map.of(). The PropertyVO's value
+		// was therefore an empty Map ({}) on the wire and on the way back, instead
+		// of an empty array ([]).
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty("dependsOn", new ArrayList<>()));
+
+		MyPojoWithUnmappedProperties expectedPojo = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		expectedPojo.setMyName("my-name");
+		expectedPojo.setUnmappedProperties(unmappedProperties);
+
+		// Wire format mirrors what wistefan now emits on POST: value is an empty
+		// array, not an empty object.
+		String entityString = "{"
+				+ "\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\","
+				+ "\"id\":\"urn:ngsi-ld:my-pojo:the-entity\","
+				+ "\"type\":\"my-pojo\","
+				+ "\"name\":{\"value\":\"my-name\",\"type\":\"Property\"},"
+				+ "\"dependsOn\":{\"type\":\"Property\",\"value\":[]}"
+				+ "}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = entityVOMapper.fromEntityVO(theEntity, MyPojoWithUnmappedProperties.class).block();
+		assertEquals(expectedPojo, myPojoWithUnmappedProperties, "An empty array must round-trip as an empty list, not an empty object.");
+	}
+
+	@DisplayName("Map entity with an unmapped property whose value Map carries a 'value' sub-attribute (preserves the reserved-word key).")
+	@Test
+	void testWithUnmappedPropertyContainingReservedSubAttributeNamedValue() throws Exception {
+		// Reproduces a previously-uncovered collision: when a Map nested inside an
+		// unmapped property has a sub-attribute literally named "value" (one of the
+		// reserved JSON-LD/NGSI-LD names that PropertyVO has an explicit setter for),
+		// the round-trip used to drop it. The wire format carries it as
+		// "tmfEscaped-value" — EscapeCleaningParser used to unescape that to "value"
+		// at parse time, which Jackson then routed straight to PropertyVO.setValue(),
+		// bypassing the @JsonAnySetter that feeds additionalProperties. The "value"
+		// entry never reached EntityVOMapper, so fromProperty emitted only the
+		// surviving siblings.
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty(
+				"resourceCharacteristic",
+				Map.of("name", "deploymentName", "valueType", "string", "value", "hello-world-cache")));
+
+		MyPojoWithUnmappedProperties expectedPojo = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		expectedPojo.setMyName("my-name");
+		expectedPojo.setUnmappedProperties(unmappedProperties);
+
+		// Wire format mirrors what wistefan emits on POST: the structural `value`
+		// field of the outer Property holds the merged map (with the escaped key
+		// inside), and each sub-attribute is also exposed as a sibling Property —
+		// the escaped sibling is the entry that used to be lost.
+		String entityString = "{"
+				+ "\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\","
+				+ "\"id\":\"urn:ngsi-ld:my-pojo:the-entity\","
+				+ "\"type\":\"my-pojo\","
+				+ "\"name\":{\"value\":\"my-name\",\"type\":\"Property\"},"
+				+ "\"resourceCharacteristic\":{"
+				+   "\"type\":\"Property\","
+				+   "\"value\":{\"name\":\"deploymentName\",\"valueType\":\"string\",\"tmfEscaped-value\":\"hello-world-cache\"},"
+				+   "\"name\":{\"type\":\"Property\",\"value\":\"deploymentName\"},"
+				+   "\"valueType\":{\"type\":\"Property\",\"value\":\"string\"},"
+				+   "\"tmfEscaped-value\":{\"type\":\"Property\",\"value\":\"hello-world-cache\"}"
+				+ "}}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = entityVOMapper.fromEntityVO(theEntity, MyPojoWithUnmappedProperties.class).block();
+		assertEquals(expectedPojo, myPojoWithUnmappedProperties,
+				"The 'value' sub-attribute must survive the round-trip — not be swallowed by PropertyVO.value.");
+	}
+
+	@DisplayName("Map entity with an unmapped property containing a nested list of objects (preserves the inner array key).")
+	@Test
+	void testWithUnmappedPropertyContainingNestedListOfObjects() throws Exception {
+		// Reproduces a previously-uncovered case: an unmapped property whose value is a
+		// Map that holds an inner List of Maps under a NAMED key. Before the fix to
+		// fromProperty(...) in EntityVOMapper, the inner array's key was overwritten by
+		// the OUTER property name (the bug renamed e.g. {steps: [...]} → {complex: [...]}
+		// at retrieval time, mirroring the parent's name onto every nested list it held).
+		List<UnmappedProperty> unmappedProperties = new ArrayList<>();
+		unmappedProperties.add(new UnmappedProperty(
+				"complex",
+				Map.of("items", List.of(Map.of("k", "v1"), Map.of("k", "v2")))));
+
+		MyPojoWithUnmappedProperties expectedPojo = new MyPojoWithUnmappedProperties("urn:ngsi-ld:my-pojo:the-entity");
+		expectedPojo.setMyName("my-name");
+		expectedPojo.setUnmappedProperties(unmappedProperties);
+
+		String entityString = "{"
+				+ "\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\","
+				+ "\"id\":\"urn:ngsi-ld:my-pojo:the-entity\","
+				+ "\"type\":\"my-pojo\","
+				+ "\"name\":{\"value\":\"my-name\",\"type\":\"Property\"},"
+				+ "\"complex\":{"
+				+   "\"type\":\"Property\","
+				+   "\"value\":{\"items\":[{\"k\":\"v1\"},{\"k\":\"v2\"}]},"
+				+   "\"items\":["
+				+     "{\"type\":\"Property\",\"value\":{\"k\":\"v1\"},\"k\":{\"type\":\"Property\",\"value\":\"v1\"}},"
+				+     "{\"type\":\"Property\",\"value\":{\"k\":\"v2\"},\"k\":{\"type\":\"Property\",\"value\":\"v2\"}}"
+				+   "]"
+				+ "}}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithUnmappedProperties myPojoWithUnmappedProperties = entityVOMapper.fromEntityVO(theEntity, MyPojoWithUnmappedProperties.class).block();
+		assertEquals(expectedPojo, myPojoWithUnmappedProperties, "The inner list's key must be preserved (not overwritten by the outer property's name).");
+	}
+
+	@DisplayName("Map Pojo with a mapped sub-property whose nested object carries reserved-word fields (id/value/type).")
+	@Test
+	void testSubPropertyWithNestedReservedFieldsRoundTrip() throws Exception {
+		// Reproduces the TMForum *RefOrValue regression after the
+		// VO_FIELD_COLLISIONS guard was added: a parent entity has a
+		// @AttributeSetter(PROPERTY) field whose Java type is a complex object
+		// holding reserved-word fields (id, value, type). On the wire those keys
+		// are escaped (tmfEscaped-id, …) so the EscapeCleaningParser does NOT
+		// route them to PropertyVO.setValue / EntityVO.setId. But by the time we
+		// hand the Property.value Map to objectMapper.convertValue(...) to
+		// materialize the USER POJO, the escape is in the way — Jackson can't
+		// find a field literally called "tmfEscaped-id" on the target class and
+		// silently drops the value. EntityVOMapper.handleProperty must surface
+		// the original names before delegating to Jackson.
+		MySubPropertyRefOrValue expectedSub = new MySubPropertyRefOrValue();
+		expectedSub.setId(URI.create("urn:ref:42"));
+		expectedSub.setHref(URI.create("http://my-ref.de"));
+		expectedSub.setValue("the-value");
+		expectedSub.setType("the-type");
+		expectedSub.setName("the-name");
+
+		MyPojoWithSubPropertyRefOrValue expectedPojo = new MyPojoWithSubPropertyRefOrValue("urn:ngsi-ld:complex-pojo:the-test-pojo");
+		expectedPojo.setMyRefOrValue(expectedSub);
+
+		String entityString = "{"
+				+ "\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\","
+				+ "\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\","
+				+ "\"type\":\"complex-pojo\","
+				+ "\"myRefOrValue\":{"
+				+   "\"type\":\"Property\","
+				+   "\"value\":{"
+				+     "\"tmfEscaped-id\":\"urn:ref:42\","
+				+     "\"href\":\"http://my-ref.de\","
+				+     "\"tmfEscaped-value\":\"the-value\","
+				+     "\"tmfEscaped-type\":\"the-type\","
+				+     "\"name\":\"the-name\""
+				+   "}"
+				+ "}}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithSubPropertyRefOrValue actual = entityVOMapper.fromEntityVO(theEntity, MyPojoWithSubPropertyRefOrValue.class).block();
+		assertEquals(expectedPojo, actual, "Reserved-word fields nested inside a mapped property must round-trip.");
+	}
+
+	@DisplayName("Map Pojo with a mapped property-list whose elements carry reserved-word fields (id/value/type).")
+	@Test
+	void testPropertyListWithNestedReservedFieldsRoundTrip() throws Exception {
+		// Same regression as the sub-property variant, exercised through the
+		// PROPERTY_LIST code path (handlePropertyList → propertyListToTargetClass).
+		MySubPropertyRefOrValue expectedSub1 = new MySubPropertyRefOrValue();
+		expectedSub1.setId(URI.create("urn:ref:1"));
+		expectedSub1.setHref(URI.create("http://my-ref.de/1"));
+		expectedSub1.setValue("value-1");
+		expectedSub1.setType("type-1");
+		expectedSub1.setName("name-1");
+
+		MySubPropertyRefOrValue expectedSub2 = new MySubPropertyRefOrValue();
+		expectedSub2.setId(URI.create("urn:ref:2"));
+		expectedSub2.setHref(URI.create("http://my-ref.de/2"));
+		expectedSub2.setValue("value-2");
+		expectedSub2.setType("type-2");
+		expectedSub2.setName("name-2");
+
+		MyPojoWithSubPropertyRefOrValue expectedPojo = new MyPojoWithSubPropertyRefOrValue("urn:ngsi-ld:complex-pojo:the-test-pojo");
+		expectedPojo.setMyRefOrValueList(List.of(expectedSub1, expectedSub2));
+
+		String entityString = "{"
+				+ "\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\","
+				+ "\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\","
+				+ "\"type\":\"complex-pojo\","
+				+ "\"myRefOrValueList\":["
+				+   "{\"type\":\"Property\",\"value\":{"
+				+     "\"tmfEscaped-id\":\"urn:ref:1\","
+				+     "\"href\":\"http://my-ref.de/1\","
+				+     "\"tmfEscaped-value\":\"value-1\","
+				+     "\"tmfEscaped-type\":\"type-1\","
+				+     "\"name\":\"name-1\""
+				+   "}},"
+				+   "{\"type\":\"Property\",\"value\":{"
+				+     "\"tmfEscaped-id\":\"urn:ref:2\","
+				+     "\"href\":\"http://my-ref.de/2\","
+				+     "\"tmfEscaped-value\":\"value-2\","
+				+     "\"tmfEscaped-type\":\"type-2\","
+				+     "\"name\":\"name-2\""
+				+   "}}"
+				+ "]}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithSubPropertyRefOrValue actual = entityVOMapper.fromEntityVO(theEntity, MyPojoWithSubPropertyRefOrValue.class).block();
+		assertEquals(expectedPojo, actual, "Reserved-word fields inside a mapped property-list element must round-trip.");
+	}
+
+	@DisplayName("Map Pojo with a field that is an object.")
+	@Test
+	void testSubPropertyMapping() throws JsonProcessingException {
+		MyPojoWithSubProperty expectedPojo = new MyPojoWithSubProperty("urn:ngsi-ld:complex-pojo:the-test-pojo");
+		MySubProperty mySubProperty = new MySubProperty();
+		mySubProperty.setPropertyName("My property");
+		expectedPojo.setMySubProperty(mySubProperty);
+
+		String entityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"mySubProperty\":{\"value\":{\"propertyName\":\"My property\"},\"type\":\"Property\",\"propertyName\":{\"value\":\"My property\",\"type\":\"Property\"}}}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithSubProperty myPojoWithSubProperty = entityVOMapper.fromEntityVO(theEntity, MyPojoWithSubProperty.class).block();
+		assertEquals(expectedPojo, myPojoWithSubProperty, "The full pojo should be returned.");
+	}
+
+	@DisplayName("Map Pojo with a field that is a list of objects.")
+	@Test
+	void testListOfSubPropertyMapping() throws JsonProcessingException {
+		MyPojoWithListOfSubProperty expectedPojo = new MyPojoWithListOfSubProperty(
+				"urn:ngsi-ld:complex-pojo:the-test-pojo");
+		MySubProperty mySubProperty1 = new MySubProperty();
+		mySubProperty1.setPropertyName("My property 1");
+		MySubProperty mySubProperty2 = new MySubProperty();
+		mySubProperty2.setPropertyName("My property 2");
+		expectedPojo.setMySubProperties(List.of(mySubProperty1, mySubProperty2));
+
+		String entityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"mySubProperty\":[{\"value\":{\"propertyName\":\"My property 1\"},\"type\":\"Property\"},{\"value\":{\"propertyName\":\"My property 2\"},\"type\":\"Property\"}]}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithListOfSubProperty myPojoWithListOfSubProperty = entityVOMapper.fromEntityVO(theEntity, MyPojoWithListOfSubProperty.class).block();
+		assertEquals(expectedPojo, myPojoWithListOfSubProperty, "The full pojo should be returned.");
+	}
+
+
+	@DisplayName("Map entity containing a relationship that could not be resolved with strict-mapping disabled.")
+	@Test
+	void testSubEntityMappingNoStrict() throws JsonProcessingException {
+		mappingProperties.setStrictRelationships(false);
+		MySubPropertyEntity expectedSubEntity = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:the-sub-entity");
+		MyPojoWithSubEntity expectedPojo = new MyPojoWithSubEntity("urn:ngsi-ld:complex-pojo:the-test-pojo");
+		expectedPojo.setMySubProperty(expectedSubEntity);
+
+		when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of()));
+
+		String parentEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity\":{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"datasetId\":\"urn:ngsi-ld:sub-entity:the-sub-entity\"}}";
+		EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
+
+		MyPojoWithSubEntity myPojoWithSubEntity = entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntity.class).block();
+		assertEquals(expectedPojo, myPojoWithSubEntity, "The full pojo should be retrieved.");
+	}
+
+	@DisplayName("Fail entity containing a relationship that could not be resolved with strict-mapping enabled.")
+	@Test
+	void testSubEntityMappingStrict() throws JsonProcessingException {
+		mappingProperties.setStrictRelationships(true);
+		when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of()));
+
+		String parentEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity\":{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"datasetId\":\"urn:ngsi-ld:sub-entity:the-sub-entity\"}}";
+		EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
+
+		assertThrows(MappingException.class, () -> entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntity.class).block(), "For strict-mapping, an exception should be thrown.");
+	}
+
+
+	@DisplayName("Map entity containing a relationship with embedded values.")
+	@Test
+	void testSubEntityEmbedMapping() throws JsonProcessingException {
+		MySubPropertyEntityEmbed expectedSubEntity = new MySubPropertyEntityEmbed("urn:ngsi-ld:sub-entity:the-sub-entity");
+		MyPojoWithSubEntityEmbed expectedPojo = new MyPojoWithSubEntityEmbed("urn:ngsi-ld:complex-pojo:the-test-pojo");
+		expectedPojo.setMySubProperty(expectedSubEntity);
+
+		String subEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"sub-entity\",\"name\":{\"type\":\"Property\",\"value\":\"myName\"}}";
+		EntityVO subEntity = OBJECT_MAPPER.readValue(subEntityString, EntityVO.class);
+
+		when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of(subEntity)));
+
+		String parentEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity\":{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"datasetId\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"role\":{\"type\":\"Property\",\"value\":\"Sub-Entity\"}}}";
+		EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
+
+		MyPojoWithSubEntityEmbed myPojoWithSubEntityEmbed = entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityEmbed.class).block();
+		assertEquals(expectedPojo, myPojoWithSubEntityEmbed, "The full pojo should be retrieved.");
+	}
+
+	@DisplayName("Map entity with all supported attribute types.")
+	@Test
+	void testListEntityMapping() throws JsonProcessingException {
+		PropertyListPojo propertyListPojo = new PropertyListPojo("urn:ngsi-ld:list-pojo:the-pojo");
+
+		MySubPropertyEntity subEntity1 = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:the-sub-entity-1");
+		MySubPropertyEntity subEntity2 = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:the-sub-entity-2");
+
+		MySubProperty property1 = new MySubProperty();
+		property1.setPropertyName("p-1");
+		MySubProperty property2 = new MySubProperty();
+		property2.setPropertyName("p-2");
+
+		propertyListPojo.setProperty(property1);
+		propertyListPojo.setRelationShip(subEntity1);
+		propertyListPojo.setPropertyList(List.of(property1, property2));
+		propertyListPojo.setRelationshipList(List.of(subEntity1, subEntity2));
+
+		String subEntity1String = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:sub-entity:the-sub-entity-1\",\"type\":\"sub-entity\",\"name\":{\"type\":\"Property\",\"value\":\"myName\"}}";
+		String subEntity2String = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:sub-entity:the-sub-entity-2\",\"type\":\"sub-entity\",\"name\":{\"type\":\"Property\",\"value\":\"myName\"}}";
+
+		EntityVO parsedSubEntity1 = OBJECT_MAPPER.readValue(subEntity1String, EntityVO.class);
+		EntityVO parsedSubEntity2 = OBJECT_MAPPER.readValue(subEntity2String, EntityVO.class);
+
+		when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of(parsedSubEntity1, parsedSubEntity2)));
+
+		String parentEntityString = "{\n" +
+				"\t\"@context\": \"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\n" +
+				"\t\"id\": \"urn:ngsi-ld:list-pojo:the-pojo\",\n" +
+				"\t\"type\": \"list-pojo\",\n" +
+				"\t\"mySubProperty\": {\n" +
+				"\t  \"value\": {\n" +
+				"\t\t\"propertyName\": \"p-1\"\n" +
+				"\t  },\n" +
+				"\t  \"type\": \"Property\"\n" +
+				"\t},\n" +
+				"\t\"myRelationship\": {\n" +
+				"\t\t\"object\": \"urn:ngsi-ld:sub-entity:the-sub-entity-1\",\n" +
+				"\t\t\"type\": \"Relationship\",\n" +
+				"\t\t\"datasetId\": \"urn:ngsi-ld:sub-entity:the-sub-entity-1\"\n" +
+				"\t},\n" +
+				"\t\"mySubPropertyList\": [\n" +
+				"\t \t{\n" +
+				"\t\t \"value\": {\n" +
+				"\t\t\t\"propertyName\": \"p-1\"\n" +
+				"\t\t  },\n" +
+				"\t  \t\"type\": \"Property\"\n" +
+				"\t\t}, \n" +
+				"\t  \t{\n" +
+				"\t\t  \"value\": {\n" +
+				"\t\t\t\"propertyName\": \"p-2\"\n" +
+				"\t\t  },\n" +
+				"\t\t  \"type\": \"Property\"\n" +
+				"\t\t}\n" +
+				"\t],\n" +
+				"\t\"myRelationshipList\": [\n" +
+				"\t \t{\n" +
+				"\t\t  \"object\": \"urn:ngsi-ld:sub-entity:the-sub-entity-1\",\n" +
+				"\t\t  \"type\": \"Relationship\",\n" +
+				"\t\t  \"datasetId\": \"urn:ngsi-ld:sub-entity:the-sub-entity-1\"\n" +
+				"\t\t}, \n" +
+				"\t  \t{\n" +
+				"\t\t  \"object\": \"urn:ngsi-ld:sub-entity:the-sub-entity-2\",\n" +
+				"\t\t  \"type\": \"Relationship\",\n" +
+				"\t\t  \"datasetId\": \"urn:ngsi-ld:sub-entity:the-sub-entity-2\"\n" +
+				"\t\t}\n" +
+				"\t]\n" +
+				"}";
+		EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
+
+		PropertyListPojo mappedPojo = entityVOMapper.fromEntityVO(parentEntity, PropertyListPojo.class).block();
+		assertEquals(propertyListPojo, mappedPojo, "The full pojo should be retrieved.");
+	}
+
+	@DisplayName("Only mapping to classes with mapping enabled is supported.")
+	@Test
+	void failWithoutMappingEnabled() {
+		assertThrows(MappingException.class, () -> entityVOMapper.fromEntityVO(new EntityVO(), Object.class).block(), "Only mapping to classes with mapping enabled is supported.");
+	}
+
+	@DisplayName("Only mapping to matching classes is supported.")
+	@Test
+	void failWithoutMatchingClass() {
+		EntityVO myEntity = new EntityVO().type("my-type");
+		assertThrows(MappingException.class, () -> entityVOMapper.fromEntityVO(myEntity, MyPojo.class).block(), "Only mapping to matching classes is supported.");
+	}
+
+	@DisplayName("The target classes should provide a string constructor.")
+	@Test
+	void failWithoutWrongConstructor() {
+		when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of()));
+
+		EntityVO myEntity = new EntityVO().type("my-pojo").id(URI.create("urn:ngsi-ld:pojo:pojo"));
+		assertThrows(MappingException.class, () -> entityVOMapper.fromEntityVO(myEntity, MyPojoWithWrongConstructor.class).block(), "The target classes should provide a string constructor.");
+	}
+
+	@DisplayName("Unmapped properties should be ignored.")
+	@Test
+	void ignoreUnmappedProperties() {
+		MySubPropertyEntity mySubPropertyEntity = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:entity");
+		mySubPropertyEntity.setMyName("non-ignore");
+		EntityVO entityVO = new EntityVO().id(URI.create("urn:ngsi-ld:sub-entity:entity")).type("sub-entity");
+		entityVO.setAdditionalProperties("non-prop", new PropertyVO().value("ignore"));
+		entityVO.setAdditionalProperties("name", new PropertyVO().value("non-ignore"));
+		assertEquals(mySubPropertyEntity, entityVOMapper.fromEntityVO(entityVO, MySubPropertyEntity.class).block(), "The non-prop should be ignored.");
+	}
+
+	@DisplayName("If the constructor is broken, nothing should be mapped.")
+	@Test
+	void failOnBrokenConstructor() {
+		EntityVO entityVO = new EntityVO().id(URI.create("urn:ngsi-ld:throwing-pojo:id")).type("throwing-pojo");
+		assertThrows(MappingException.class, () -> entityVOMapper.fromEntityVO(entityVO, MyThrowingConstructor.class).block(), "If the constructor is broken, nothing should be mapped.");
+	}
+
+	@DisplayName("The relationship target should have been created from its properties.")
+	@Test
+	void mapFromProperties() {
+		EntityVO parentEntity = new EntityVO().id(URI.create("urn:ngsi-ld:complex-pojo:entity")).type("complex-pojo");
+		EntityVO subEntity = new EntityVO().id(URI.create("urn:ngsi-ld:sub-entity:entity")).type("sub-entity");
+		RelationshipVO subRel = new RelationshipVO()._object(subEntity.getId());
+		subRel.setAdditionalProperties("name", new PropertyVO().value("my-other-name"));
+		parentEntity.setAdditionalProperties("mySubProperty", subRel);
+
+		MySubPropertyEntity expectedSub = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:entity");
+		expectedSub.setMyName("my-other-name");
+		MyPojoWithSubEntityFrom expectedPojo = new MyPojoWithSubEntityFrom("urn:ngsi-ld:complex-pojo:entity");
+		expectedPojo.setMySubProperty(expectedSub);
+
+		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityFrom.class).block(), "The relationship target should have been created from its properties.");
+	}
+
+	@DisplayName("A legacy name should be used as a fallback when the primary name is absent.")
+	@Test
+	void mapFromPropertiesUsesLegacyNameAsFallback() {
+		EntityVO parentEntity = new EntityVO().id(URI.create("urn:ngsi-ld:complex-pojo:entity")).type("complex-pojo");
+		EntityVO subEntity = new EntityVO().id(URI.create("urn:ngsi-ld:sub-entity:entity")).type("sub-entity");
+		RelationshipVO subRel = new RelationshipVO()._object(subEntity.getId());
+		subRel.setAdditionalProperties("legacy-name", new PropertyVO().value("my-legacy-name"));
+		parentEntity.setAdditionalProperties("mySubProperty", subRel);
+
+		MySubPropertyEntity expectedSub = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:entity");
+		expectedSub.setMyName("my-legacy-name");
+		MyPojoWithSubEntityFrom expectedPojo = new MyPojoWithSubEntityFrom("urn:ngsi-ld:complex-pojo:entity");
+		expectedPojo.setMySubProperty(expectedSub);
+
+		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityFrom.class).block(),
+				"The legacy name should have been used, since the primary name was absent.");
+	}
+
+	@DisplayName("The primary name should win over a legacy name when both are present.")
+	@Test
+	void mapFromPropertiesPrefersPrimaryOverLegacyName() {
+		EntityVO parentEntity = new EntityVO().id(URI.create("urn:ngsi-ld:complex-pojo:entity")).type("complex-pojo");
+		EntityVO subEntity = new EntityVO().id(URI.create("urn:ngsi-ld:sub-entity:entity")).type("sub-entity");
+		RelationshipVO subRel = new RelationshipVO()._object(subEntity.getId());
+		subRel.setAdditionalProperties("name", new PropertyVO().value("my-other-name"));
+		subRel.setAdditionalProperties("legacy-name", new PropertyVO().value("should-not-be-used"));
+		parentEntity.setAdditionalProperties("mySubProperty", subRel);
+
+		MySubPropertyEntity expectedSub = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:entity");
+		expectedSub.setMyName("my-other-name");
+		MyPojoWithSubEntityFrom expectedPojo = new MyPojoWithSubEntityFrom("urn:ngsi-ld:complex-pojo:entity");
+		expectedPojo.setMySubProperty(expectedSub);
+
+		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityFrom.class).block(),
+				"The primary name should win when both are present.");
+	}
+
+	@DisplayName("The primary name should be used when a legacy name is configured but absent from the data.")
+	@Test
+	void mapFromPropertiesUsesPrimaryNameWhenLegacyNameAbsent() {
+		EntityVO parentEntity = new EntityVO().id(URI.create("urn:ngsi-ld:complex-pojo:entity")).type("complex-pojo");
+		EntityVO subEntity = new EntityVO().id(URI.create("urn:ngsi-ld:sub-entity:entity")).type("sub-entity");
+		RelationshipVO subRel = new RelationshipVO()._object(subEntity.getId());
+		subRel.setAdditionalProperties("name", new PropertyVO().value("my-other-name"));
+		parentEntity.setAdditionalProperties("mySubProperty", subRel);
+
+		MySubPropertyEntity expectedSub = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:entity");
+		expectedSub.setMyName("my-other-name");
+		MyPojoWithSubEntityFrom expectedPojo = new MyPojoWithSubEntityFrom("urn:ngsi-ld:complex-pojo:entity");
+		expectedPojo.setMySubProperty(expectedSub);
+
+		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityFrom.class).block(),
+				"The primary name should have been used, since no legacy name was present in the data at all.");
+	}
+
+	@DisplayName("Neither the primary nor a legacy name should be set when both are absent from the data.")
+	@Test
+	void mapFromPropertiesLeavesFieldUnsetWhenNeitherPrimaryNorLegacyNamePresent() {
+		EntityVO parentEntity = new EntityVO().id(URI.create("urn:ngsi-ld:complex-pojo:entity")).type("complex-pojo");
+		EntityVO subEntity = new EntityVO().id(URI.create("urn:ngsi-ld:sub-entity:entity")).type("sub-entity");
+		RelationshipVO subRel = new RelationshipVO()._object(subEntity.getId());
+		parentEntity.setAdditionalProperties("mySubProperty", subRel);
+
+		MySubPropertyEntity expectedSub = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:entity");
+		MyPojoWithSubEntityFrom expectedPojo = new MyPojoWithSubEntityFrom("urn:ngsi-ld:complex-pojo:entity");
+		expectedPojo.setMySubProperty(expectedSub);
+
+		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityFrom.class).block(),
+				"The field should remain unset, since neither the primary nor any legacy name was present in the data.");
+	}
+
+
+	@DisplayName("The relationship targets should have been created from its properties.")
+	@Test
+	void mapListFromProperties() {
+		EntityVO parentEntity = new EntityVO().id(URI.create("urn:ngsi-ld:complex-pojo:entity")).type("complex-pojo");
+		EntityVO subEntity1 = new EntityVO().id(URI.create("urn:ngsi-ld:sub-entity:entity-1")).type("sub-entity");
+		EntityVO subEntity2 = new EntityVO().id(URI.create("urn:ngsi-ld:sub-entity:entity-2")).type("sub-entity");
+		RelationshipVO subRel1 = new RelationshipVO()._object(subEntity1.getId());
+		RelationshipVO subRel2 = new RelationshipVO()._object(subEntity2.getId());
+
+		subRel1.setAdditionalProperties("name", new PropertyVO().value("sub-entity-1"));
+		subRel2.setAdditionalProperties("name", new PropertyVO().value("sub-entity-2"));
+		RelationshipListVO relationshipVOS = new RelationshipListVO();
+		relationshipVOS.add(subRel1);
+		relationshipVOS.add(subRel2);
+		parentEntity.setAdditionalProperties("mySubProperty", relationshipVOS);
+
+		MySubPropertyEntity expectedSub1 = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:entity-1");
+		expectedSub1.setMyName("sub-entity-1");
+		MySubPropertyEntity expectedSub2 = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:entity-2");
+		expectedSub2.setMyName("sub-entity-2");
+		MyPojoWithSubEntityListFrom expectedPojo = new MyPojoWithSubEntityListFrom("urn:ngsi-ld:complex-pojo:entity");
+		expectedPojo.setMySubProperty(List.of(expectedSub1, expectedSub2));
+
+		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityListFrom.class).block(), "The relationship targets should have been created from its properties.");
+	}
+
+	@DisplayName("A legacy name should be used as a fallback for a relationship inside a relationship list.")
+	@Test
+	void mapListFromPropertiesUsesLegacyNameAsFallback() {
+		EntityVO parentEntity = new EntityVO().id(URI.create("urn:ngsi-ld:complex-pojo:entity")).type("complex-pojo");
+		EntityVO subEntity1 = new EntityVO().id(URI.create("urn:ngsi-ld:sub-entity:entity-1")).type("sub-entity");
+		EntityVO subEntity2 = new EntityVO().id(URI.create("urn:ngsi-ld:sub-entity:entity-2")).type("sub-entity");
+		RelationshipVO subRel1 = new RelationshipVO()._object(subEntity1.getId());
+		RelationshipVO subRel2 = new RelationshipVO()._object(subEntity2.getId());
+
+		// entity-1 only has the legacy name in the data, entity-2 only has the primary name.
+		subRel1.setAdditionalProperties("legacy-name", new PropertyVO().value("sub-entity-1-legacy"));
+		subRel2.setAdditionalProperties("name", new PropertyVO().value("sub-entity-2"));
+		RelationshipListVO relationshipVOS = new RelationshipListVO();
+		relationshipVOS.add(subRel1);
+		relationshipVOS.add(subRel2);
+		parentEntity.setAdditionalProperties("mySubProperty", relationshipVOS);
+
+		MySubPropertyEntity expectedSub1 = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:entity-1");
+		expectedSub1.setMyName("sub-entity-1-legacy");
+		MySubPropertyEntity expectedSub2 = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:entity-2");
+		expectedSub2.setMyName("sub-entity-2");
+		MyPojoWithSubEntityListFrom expectedPojo = new MyPojoWithSubEntityListFrom("urn:ngsi-ld:complex-pojo:entity");
+		expectedPojo.setMySubProperty(List.of(expectedSub1, expectedSub2));
+
+		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityListFrom.class).block(),
+				"Each relationship in the list should independently fall back to the legacy name when the primary name is absent.");
+	}
+
+	@DisplayName("If the setter is broken, nothing should be constructed.")
+	@Test
+	void failWithThrowingSetter() {
+		EntityVO entity = new EntityVO().id(URI.create("urn:ngsi-ld:my-pojo:entity")).type("my-pojo");
+		assertThrows(MappingException.class, () -> entityVOMapper.fromEntityVO(entity, MySetterThrowingPojo.class).block(), "If the setter is broken, nothing should be constructed.");
+	}
+
+	@DisplayName("Well known properties should properly be mapped.")
+	@Test
+	void mapWithWellKnown() {
+		EntityVO entityVO = new EntityVO().id(URI.create("urn:ngsi-ld:complex-pojo:entity")).type("complex-pojo");
+		EntityVO subEntity = new EntityVO().id(URI.create("urn:ngsi-ld:sub-entity:entity")).type("sub-entity");
+		when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of(subEntity)));
+
+		RelationshipVO subRel = new RelationshipVO()
+				._object(subEntity.getId())
+				.observedAt(Instant.MAX)
+				.createdAt(Instant.MAX)
+				.modifiedAt(Instant.MAX)
+				.datasetId(subEntity.getId())
+				.instanceId(URI.create("id"));
+		entityVO.setAdditionalProperties("mySubProperty", subRel);
+
+		MySubPropertyEntityWithWellKnown mySubPropertyEntityWithWellKnown = new MySubPropertyEntityWithWellKnown("urn:ngsi-ld:sub-entity:entity");
+		mySubPropertyEntityWithWellKnown.setDatasetId("urn:ngsi-ld:sub-entity:entity");
+		mySubPropertyEntityWithWellKnown.setInstanceId("id");
+		mySubPropertyEntityWithWellKnown.setCreatedAt(Instant.MAX);
+		mySubPropertyEntityWithWellKnown.setModifiedAt(Instant.MAX);
+		mySubPropertyEntityWithWellKnown.setObservedAt(Instant.MAX);
+
+		MyPojoWithSubEntityWellKnown myPojoWithSubEntityWellKnown = new MyPojoWithSubEntityWellKnown("urn:ngsi-ld:complex-pojo:entity");
+		myPojoWithSubEntityWellKnown.setMySubProperty(mySubPropertyEntityWithWellKnown);
+
+		assertEquals(myPojoWithSubEntityWellKnown, entityVOMapper.fromEntityVO(entityVO, MyPojoWithSubEntityWellKnown.class).block(), "Well known properties should properly be mapped.");
+	}
+
+	@Test
+	public void testConvertEntityToMap() {
+		MySimplePojo pojo = new MySimplePojo();
+		pojo.setMyName("Some");
+		pojo.setNumbers(List.of());
+
+		assertEquals(
+				Map.ofEntries(
+						Map.entry("myName", pojo.getMyName()),
+						Map.entry("numbers", pojo.getNumbers())
+				),
+				entityVOMapper.convertEntityToMap(pojo));
+	}
+
+	@Test
+	void testReadingNotificationFromJson() throws JsonProcessingException {
+		String json = """
+				{
+				  "id": "urn:ngsi-ld:Notification:4233e3ca-50c3-11ee-8433-0a580a826912",
+				  "type": "Notification",
+				  "subscriptionId": "urn:ngsi-ld:subscription:567f4788-50bf-11ee-94e9-0a580a826911",
+				  "notifiedAt": "2023-09-11T16:50:05.456Z",
+				  "data": [
+				    {
+				      "id": "urn:ngsi-ld:product:4d0964a4-2341-4676-a551-de5115ccf98d",
+				      "type": "product",
+				      "deletedAt": "2023-09-11T16:50:05.456Z"
+				    }
+				  ]
+				}""";
+		NotificationVO notificationVO = entityVOMapper.readNotificationFromJSON(json);
+
+		assertNotNull(notificationVO);
+		assertEquals("Notification", notificationVO.getType());
+	}
+
+	@DisplayName("Query mapping")
+	@Test
+	void testQueryMapping() {
+		MySubscriptionPojo myPojo = createSubscription();
+
+		assertEquals(myPojo.getQ(), entityVOMapper.toSubscriptionVO(myPojo).getQ(),
+				"The pojo should have the same query");
+	}
+
+	@DisplayName("Notification endpoint mapping")
+	@Test
+	void testNotificationEndpointMapping() {
+		MySubscriptionPojo myPojo = createSubscription();
+
+		assertEquals(myPojo.getNotification().getEndpoint().getUri(), entityVOMapper.toSubscriptionVO(myPojo).getNotification().getEndpoint().getUri(),
+				"The pojo should have the same notification endpoint");
+	}
+
+	@DisplayName("Map entity with duplicate relationship")
+	@Test
+	void testDuplicateRelationship() throws Exception {
+		MySubPropertyEntity expectedSubEntity = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:the-sub-entity");
+		MyPojoWithSubEntityList expectedPojo = new MyPojoWithSubEntityList("urn:ngsi-ld:complex-pojo:the-test-pojo");
+		expectedPojo.setMySubPropertyList(List.of(expectedSubEntity, expectedSubEntity));
+
+		String subEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"sub-entity\",\"name\":{\"type\":\"Property\",\"value\":\"myName\"}}";
+		EntityVO subEntity = OBJECT_MAPPER.readValue(subEntityString, EntityVO.class);
+
+		when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of(subEntity, subEntity)));
+
+		String parentEntityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity-list\":[{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"datasetId\":\"urn:ngsi-ld:sub-entity:the-sub-entity\"},{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"datasetId\":\"urn:ngsi-ld:sub-entity:the-sub-entity\"}]}";
+		EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
+
+		MyPojoWithSubEntityList myPojoWithSubEntity = entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityList.class).block();
+		assertEquals(expectedPojo, myPojoWithSubEntity, "The full pojo should be retrieved.");
+	}
+
+	@DisplayName("*****Test mapping geo entities*****")
+	@Test
+	void testMappingGeoEntities() throws JsonProcessingException {
+		MyPojoWithLocation expectedPojoWithLocation = new MyPojoWithLocation("urn:ngsi-ld:complex-pojo:the-test-pojo");
+		MyLocation location = new MyLocation();
+		double[] coordinates = new double[]{0.0, 0.0};
+		location.setCoordinates(coordinates);
+		expectedPojoWithLocation.setMyLocation(location);
+		String entityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"location-pojo\",\"myLocation\": { \"type\": \"GeoProperty\",    \"value\": {      \"type\": \"Point\",      \"coordinates\": [0,0]    }  }}";
+		EntityVO parsedEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+		//GeoPropertyVO
+		MyPojoWithLocation myPojoWithLocation = entityVOMapper.fromEntityVO(parsedEntity, MyPojoWithLocation.class).block();
+		assertEquals(expectedPojoWithLocation.getId(), myPojoWithLocation.getId(), "GeoEntities can be mapped to their Java Objects");
+	}
+
+	private MySubscriptionPojo createSubscription() {
+		MySubscriptionPojo myPojo = new MySubscriptionPojo("urn:ngsi-ld:my-pojo:the-test-pojo");
+		myPojo.setQ("eventType=custom");
+		myPojo.setNotification(createNotification());
+
+		return myPojo;
+	}
+
+	private MyNotificationParamsEndpointProperty createEndpoint() {
+		MyNotificationParamsEndpointProperty endpointProperty = new MyNotificationParamsEndpointProperty();
+		endpointProperty.setUri(URI.create("test.com"));
+		endpointProperty.setAccept("application/ld+json");
+		return endpointProperty;
+	}
+
+	private MyNotificationParamsProperty createNotification() {
+		MyNotificationParamsProperty notificationParamsProperty = new MyNotificationParamsProperty();
+		notificationParamsProperty.setEndpoint(createEndpoint());
+		notificationParamsProperty.setFormat("keyValues");
+		return notificationParamsProperty;
+	}
 }
