@@ -125,6 +125,19 @@ class JavaObjectMapperTest {
 				"The pojo should have been translated into a valid entity");
 	}
 
+	@DisplayName("An embedded property named after a newly added reserved word should be escaped on the wire.")
+	@Test
+	void testSubEntityEmbedMappingWithReservedWordProperty() throws JsonProcessingException {
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity\":{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"role\":{\"value\":\"Sub-Entity\",\"type\":\"Property\"},\"tmfEscaped-unitCode\":{\"value\":\"C62\",\"type\":\"Property\"}}}";
+
+		MySubPropertyEntityEmbed mySubProperty = new MySubPropertyEntityEmbed("urn:ngsi-ld:sub-entity:the-sub-entity");
+		mySubProperty.setUnitCode("C62");
+		MyPojoWithSubEntityEmbed myComplexPojo = new MyPojoWithSubEntityEmbed("urn:ngsi-ld:complex-pojo:the-test-pojo");
+		myComplexPojo.setMySubProperty(mySubProperty);
+		assertEquals(expectedJson, OBJECT_MAPPER.writeValueAsString(javaObjectMapper.toEntityVO(myComplexPojo)),
+				"The embedded 'unitCode' property should have been escaped, since it collides with PropertyVO's own field.");
+	}
+
 	@DisplayName("Map Pojo with a field that is a relationship-list.")
 	@Test
 	void testEntityWithRelationShipList() throws JsonProcessingException {

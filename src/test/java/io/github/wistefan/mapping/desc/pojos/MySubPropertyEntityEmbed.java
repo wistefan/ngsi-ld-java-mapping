@@ -35,4 +35,11 @@ public class MySubPropertyEntityEmbed {
 	@Getter(onMethod = @__({@AttributeGetter(value = AttributeType.PROPERTY, targetName = "role", embedProperty = true)}))
 	@Setter(onMethod = @__({@AttributeSetter(value = AttributeType.PROPERTY, targetName = "role")}))
 	private String role = "Sub-Entity";
+
+	// "unitCode" is one of the reserved words added to ReservedWordHandler that collides with an
+	// explicit VO setter (PropertyVO.unitCode) - used to verify an embedded Property named after it
+	// still round-trips correctly instead of colliding with that structural field.
+	@Getter(onMethod = @__({@AttributeGetter(value = AttributeType.PROPERTY, targetName = "unitCode", embedProperty = true)}))
+	@Setter(onMethod = @__({@AttributeSetter(value = AttributeType.PROPERTY, targetName = "unitCode")}))
+	private String unitCode;
 }
