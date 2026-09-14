@@ -1,12 +1,24 @@
 package io.github.wistefan.mapping;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.wistefan.mapping.annotations.*;
+import io.github.wistefan.mapping.annotations.AttributeGetter;
+import io.github.wistefan.mapping.annotations.AttributeSetter;
+import io.github.wistefan.mapping.annotations.AttributeType;
+import io.github.wistefan.mapping.annotations.DatasetId;
+import io.github.wistefan.mapping.annotations.EntityId;
+import io.github.wistefan.mapping.annotations.EntityType;
+import io.github.wistefan.mapping.annotations.RelationshipObject;
+import io.github.wistefan.mapping.annotations.UnmappedPropertiesGetter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.fiware.ngsi.model.*;
+import org.fiware.ngsi.model.AdditionalPropertyVO;
+import org.fiware.ngsi.model.EntityVO;
+import org.fiware.ngsi.model.GeoPropertyVO;
+import org.fiware.ngsi.model.PropertyListVO;
+import org.fiware.ngsi.model.PropertyVO;
+import org.fiware.ngsi.model.RelationshipListVO;
+import org.fiware.ngsi.model.RelationshipVO;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
@@ -14,7 +26,17 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.time.Instant;
-import java.util.*;
+import java.util.AbstractMap;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -28,6 +50,16 @@ public class JavaObjectMapper extends Mapper {
 
 	// name of the property containing the ID
 	private static final String ID_PROPERTY = "id";
+
+	/**
+	 * URN prefix for synthetic datasetIds attached to each item of a plain-list
+	 * value persisted as a {@code PropertyListVO}. The datasetIds give each item
+	 * the multi-instance Property semantics that NGSI-LD brokers must preserve
+	 * — without them, a single-element array inside {@code Property.value} can
+	 * be compacted to its scalar form on retrieval (JSON-LD compaction).
+	 */
+	private static final String LIST_ITEM_DATASET_ID_PREFIX = "urn:ngsi-ld:dataset:list-item:";
+
 	private final MappingProperties mappingProperties;
 	private final ObjectMapper objectMapper;
 
@@ -392,38 +424,63 @@ public class JavaObjectMapper extends Mapper {
 	private Map<String, Object> toEscapedMap(Object o) {
 		Map<String, Object> escapedMap = new HashMap<>();
 		Map<String, Object> unescapedMap = toMap(o);
-		unescapedMap.entrySet().forEach(entry -> {
-			String escapedKey = ReservedWordHandler.escapeReservedWords(entry.getKey());
-			if (entry.getValue() instanceof List valueList) {
-				escapedMap.put(escapedKey, listToEscapedMap(valueList));
-			} else if (isPlain(entry.getValue())) {
-				escapedMap.put(escapedKey, entry.getValue());
-			} else {
-				escapedMap.put(escapedKey, toEscapedMap(entry.getValue()));
-			}
-		});
+		unescapedMap.forEach((key, value) -> {
+            String escapedKey = ReservedWordHandler.escapeReservedWords(key);
+            if (value instanceof List valueList) {
+                escapedMap.put(escapedKey, listToEscapedMap(valueList));
+            } else if (isPlain(value)) {
+                escapedMap.put(escapedKey, value);
+            } else {
+                escapedMap.put(escapedKey, toEscapedMap(value));
+            }
+        });
 		return escapedMap;
 	}
 
 
 	private AdditionalPropertyVO objectToAdditionalProperty(Object o) {
+		if (o instanceof List<?> objectList && objectList.isEmpty()) {
+			// Preserve empty arrays as empty arrays on the wire.
+			// Without this, the empty list would fall through to the Map branch
+			// below (toMap on a Collection returns Map.of()) and be persisted as
+			// an empty object {}, which fails to round-trip back to a List.
+			return new PropertyVO().value(new ArrayList<>());
+		}
 		if (o instanceof List<?> objectList && !objectList.isEmpty()) {
 			if (isPlain(objectList.get(0))) {
-				return new PropertyVO().value(listToEscapedMap(objectList));
+				// Use a PropertyListVO with synthetic datasetIds (one per item)
+				// instead of a single Property carrying a JSON array as its value.
+				// Otherwise NGSI-LD brokers may compact a single-element array to
+				// its scalar form on retrieval (JSON-LD compaction is allowed for
+				// values inside Property.value), which loses the array shape and
+				// breaks round-trip. A Property with multiple instances (one per
+				// datasetId) is the canonical NGSI-LD way to express a list of
+				// values; brokers must preserve every instance as a separate
+				// Property in the response.
+				PropertyListVO list = new PropertyListVO();
+				for (int i = 0; i < objectList.size(); i++) {
+					PropertyVO p = new PropertyVO();
+					p.setValue(objectList.get(i));
+					p.setDatasetId(URI.create(LIST_ITEM_DATASET_ID_PREFIX + i));
+					list.add(p);
+				}
+				return list;
 			} else {
 				PropertyListVO propertyVOS = new PropertyListVO();
 				RelationshipListVO relationshipVOS = new RelationshipListVO();
 				// as of now, we don't support property lists of property lists
-				objectList.stream()
-						.map(this::objectToAdditionalProperty)
-						.forEach(apvo -> {
-							if (apvo instanceof PropertyVO pvo) {
-								propertyVOS.add(pvo);
-							}
-							if (apvo instanceof RelationshipVO rvo) {
-								relationshipVOS.add(rvo);
-							}
-						});
+				for (int i = 0; i < objectList.size(); i++) {
+					AdditionalPropertyVO apvo = objectToAdditionalProperty(objectList.get(i));
+					URI datasetId = URI.create(LIST_ITEM_DATASET_ID_PREFIX + i);
+					if (apvo instanceof PropertyVO pvo) {
+						pvo.setDatasetId(datasetId);
+						propertyVOS.add(pvo);
+					}
+					if (apvo instanceof RelationshipVO rvo) {
+						rvo.setDatasetId(datasetId);
+						relationshipVOS.add(rvo);
+					}
+				}
 				if (!propertyVOS.isEmpty() && !relationshipVOS.isEmpty()) {
 					throw new MappingException("Mixed lists are not supported");
 				}
@@ -450,6 +507,18 @@ public class JavaObjectMapper extends Mapper {
 			Map<String, AdditionalPropertyVO> values = new HashMap<>();
 			objectMap.forEach((key, value) -> {
 				if (key instanceof String stringKey) {
+					// Skip lists nested inside a Map: they would be fan-out as a
+					// PropertyListVO sibling (with one PropertyVO per item, each
+					// bearing a synthetic datasetId). Brokers then consolidate that
+					// multi-instance attribute against the matching key inside our
+					// Property.value Map, collapsing a single-element array back to
+					// its scalar form and breaking the round-trip
+					// (["step-cache"] becomes "step-cache" on retrieval). The list
+					// shape is already preserved by toEscapedMap below, so no
+					// sibling is needed.
+					if (value instanceof List<?>) {
+						return;
+					}
 					propertyVO.setAdditionalProperties(ReservedWordHandler.escapeReservedWords(stringKey), objectToAdditionalProperty(value));
 				}
 
@@ -695,11 +764,12 @@ public class JavaObjectMapper extends Mapper {
 	private RelationshipVO getRelationshipVO(Method method, Object relationShipObject) {
 		try {
 
+
 			Method objectMethod = getRelationshipObjectMethod(relationShipObject).orElseThrow(
 					() -> new MappingException(
 							String.format("The relationship %s-%s does not provide an object method.",
 									relationShipObject, method)));
-			Object objectObject = objectMethod.invoke(relationShipObject);
+			Object objectObject = objectMethod.invoke(objectMethod.getDeclaringClass().cast(relationShipObject));
 			if (!(objectObject instanceof URI)) {
 				throw new MappingException(
 						String.format("The object %s of the relationship is not a URI.", relationShipObject));
@@ -708,7 +778,7 @@ public class JavaObjectMapper extends Mapper {
 			Method datasetIdMethod = getDatasetIdMethod(relationShipObject).orElseThrow(() -> new MappingException(
 					String.format("The relationship %s-%s does not provide a datasetId method.", relationShipObject,
 							method)));
-			Object datasetIdObject = datasetIdMethod.invoke(relationShipObject);
+			Object datasetIdObject = datasetIdMethod.invoke(datasetIdMethod.getDeclaringClass().cast(relationShipObject));
 			if (!(datasetIdObject instanceof URI)) {
 				throw new MappingException(
 						String.format("The datasetId %s of the relationship is not a URI.", relationShipObject));
@@ -764,6 +834,7 @@ public class JavaObjectMapper extends Mapper {
 				throw new MappingException(
 						String.format("Property list method %s::%s did not return a List.", entity, method));
 			}
+
 			AttributeGetter attributeMapping = getAttributeGetter(method.getAnnotations()).orElseThrow(
 					() -> new MappingException(String.format(NO_MAPPING_DEFINED_FOR_METHOD_TEMPLATE, method)));
 			List<Object> entityObjects = (List) o;
