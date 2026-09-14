@@ -29,23 +29,19 @@
         <url>https://github.com/wistefan/ngsi-ld-java-mapping/tree/main</url>
         <tag>HEAD</tag>
     </scm>
+
+
     <distributionManagement>
         <snapshotRepository>
-            <id>sonatype-nexus</id>
-            <name>Sonatype Nexus Snapshots</name>
-            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+            <id>sonatype.org</id>
+            <url>https://central.sonatype.com/repository/maven-snapshots/</url>
         </snapshotRepository>
-        <repository>
-            <id>sonatype-nexus</id>
-            <name>Nexus Release Repository</name>
-            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2</url>
-        </repository>
     </distributionManagement>
 
     <properties>
         <jdk.version>17</jdk.version>
         <release.version>17</release.version>
-        <micronaut.version>3.10.3</micronaut.version>
+        <micronaut.version>4.6.5</micronaut.version>
 
         <!-- project info -->
         <project.author.name>Stefan Wiedemann</project.author.name>
@@ -78,12 +74,12 @@
         <!-- annotations -->
         <version.javax.annotation-api>1.3.2</version.javax.annotation-api>
         <version.jakarta.annotation.jakarta.annotation-api>2.1.1</version.jakarta.annotation.jakarta.annotation-api>
-        <version.io.micronaut.micronaut-core>3.9.1</version.io.micronaut.micronaut-core>
+        <version.io.micronaut.micronaut-core>4.6.5</version.io.micronaut.micronaut-core>
         <version.io.micronaut.micronaut-http-client>4.7.14</version.io.micronaut.micronaut-http-client>
+        <version.io.micronaut.micronaut-jackson-databind>4.6.5</version.io.micronaut.micronaut-jackson-databind>
 
         <!-- json -->
-        <version.com.fasterxml.jackson.core.jackson-databind>2.15.0
-        </version.com.fasterxml.jackson.core.jackson-databind>
+        <version.com.fasterxml.jackson.core.jackson-databind>2.18.0</version.com.fasterxml.jackson.core.jackson-databind>
         <version.com.fasterxml.jackson.datatype.jackson-datatype-jsr310>2.18.0</version.com.fasterxml.jackson.datatype.jackson-datatype-jsr310>
 
         <!-- rx -->
@@ -101,6 +97,7 @@
         <version.org.apache.maven.plugins.maven-gpg-plugin>3.0.1</version.org.apache.maven.plugins.maven-gpg-plugin>
         <version.org.sonatype.plugins.nexus-staging-maven-plugin>1.6.13
         </version.org.sonatype.plugins.nexus-staging-maven-plugin>
+        <version.org.sonatype.central.publishing-plugin>0.8.0</version.org.sonatype.central.publishing-plugin>
 
         <!-- test -->
         <version.org.junit.jupiter>5.9.3</version.org.junit.jupiter>
@@ -199,6 +196,12 @@
             <groupId>io.micronaut</groupId>
             <artifactId>micronaut-http-client-core</artifactId>
             <version>${version.io.micronaut.micronaut-http-client}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.micronaut</groupId>
+            <artifactId>micronaut-jackson-databind</artifactId>
+            <version>${version.io.micronaut.micronaut-jackson-databind}</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -416,7 +419,7 @@
                                 <clientId>ngsi</clientId>
                                 <fullJavaUtil>true</fullJavaUtil>
                                 <useOptional>false</useOptional>
-                                <useGenericResponse>false</useGenericResponse>
+                                <useGenericResponse>true</useGenericResponse>
                                 <useLombokGenerated>true</useLombokGenerated>
                                 <introspected>true</introspected>
                                 <generateAliasAsModel>false</generateAliasAsModel>
@@ -457,7 +460,7 @@
                 </dependencies>
 
             </plugin>
-            <!-- add generated sources -->
+            <!-- add generated sources  -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>build-helper-maven-plugin</artifactId>
@@ -497,14 +500,14 @@
             <build>
                 <plugins>
                     <plugin>
-                        <groupId>org.sonatype.plugins</groupId>
-                        <artifactId>nexus-staging-maven-plugin</artifactId>
-                        <version>${version.org.sonatype.plugins.nexus-staging-maven-plugin}</version>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>${version.org.sonatype.central.publishing-plugin}</version>
                         <extensions>true</extensions>
                         <configuration>
-                            <serverId>sonatype-nexus</serverId>
-                            <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-                            <autoReleaseAfterClose>true</autoReleaseAfterClose>
+                            <publishingServerId>sonatype.org</publishingServerId>
+                            <autoPublish>true</autoPublish>
+                            <waitUntil>published</waitUntil>
                         </configuration>
                     </plugin>
                     <plugin>

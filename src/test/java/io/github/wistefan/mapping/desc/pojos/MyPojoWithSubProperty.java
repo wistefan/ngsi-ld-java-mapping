@@ -1,5 +1,6 @@
 package io.github.wistefan.mapping.desc.pojos;
 
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import io.github.wistefan.mapping.annotations.AttributeGetter;
@@ -12,6 +13,7 @@ import io.github.wistefan.mapping.annotations.MappingEnabled;
 import java.net.URI;
 
 @MappingEnabled(entityType = "complex-pojo")
+@EqualsAndHashCode
 public class MyPojoWithSubProperty {
 
 	@Getter(onMethod = @__({@EntityId}))
