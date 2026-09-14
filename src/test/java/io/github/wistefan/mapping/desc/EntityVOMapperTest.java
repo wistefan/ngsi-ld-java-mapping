@@ -746,6 +746,40 @@ class EntityVOMapperTest {
 				"The primary name should win when both are present.");
 	}
 
+	@DisplayName("The primary name should be used when a legacy name is configured but absent from the data.")
+	@Test
+	void mapFromPropertiesUsesPrimaryNameWhenLegacyNameAbsent() {
+		EntityVO parentEntity = new EntityVO().id(URI.create("urn:ngsi-ld:complex-pojo:entity")).type("complex-pojo");
+		EntityVO subEntity = new EntityVO().id(URI.create("urn:ngsi-ld:sub-entity:entity")).type("sub-entity");
+		RelationshipVO subRel = new RelationshipVO()._object(subEntity.getId());
+		subRel.setAdditionalProperties("name", new PropertyVO().value("my-other-name"));
+		parentEntity.setAdditionalProperties("mySubProperty", subRel);
+
+		MySubPropertyEntity expectedSub = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:entity");
+		expectedSub.setMyName("my-other-name");
+		MyPojoWithSubEntityFrom expectedPojo = new MyPojoWithSubEntityFrom("urn:ngsi-ld:complex-pojo:entity");
+		expectedPojo.setMySubProperty(expectedSub);
+
+		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityFrom.class).block(),
+				"The primary name should have been used, since no legacy name was present in the data at all.");
+	}
+
+	@DisplayName("Neither the primary nor a legacy name should be set when both are absent from the data.")
+	@Test
+	void mapFromPropertiesLeavesFieldUnsetWhenNeitherPrimaryNorLegacyNamePresent() {
+		EntityVO parentEntity = new EntityVO().id(URI.create("urn:ngsi-ld:complex-pojo:entity")).type("complex-pojo");
+		EntityVO subEntity = new EntityVO().id(URI.create("urn:ngsi-ld:sub-entity:entity")).type("sub-entity");
+		RelationshipVO subRel = new RelationshipVO()._object(subEntity.getId());
+		parentEntity.setAdditionalProperties("mySubProperty", subRel);
+
+		MySubPropertyEntity expectedSub = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:entity");
+		MyPojoWithSubEntityFrom expectedPojo = new MyPojoWithSubEntityFrom("urn:ngsi-ld:complex-pojo:entity");
+		expectedPojo.setMySubProperty(expectedSub);
+
+		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityFrom.class).block(),
+				"The field should remain unset, since neither the primary nor any legacy name was present in the data.");
+	}
+
 
 	@DisplayName("The relationship targets should have been created from its properties.")
 	@Test
@@ -771,6 +805,34 @@ class EntityVOMapperTest {
 		expectedPojo.setMySubProperty(List.of(expectedSub1, expectedSub2));
 
 		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityListFrom.class).block(), "The relationship targets should have been created from its properties.");
+	}
+
+	@DisplayName("A legacy name should be used as a fallback for a relationship inside a relationship list.")
+	@Test
+	void mapListFromPropertiesUsesLegacyNameAsFallback() {
+		EntityVO parentEntity = new EntityVO().id(URI.create("urn:ngsi-ld:complex-pojo:entity")).type("complex-pojo");
+		EntityVO subEntity1 = new EntityVO().id(URI.create("urn:ngsi-ld:sub-entity:entity-1")).type("sub-entity");
+		EntityVO subEntity2 = new EntityVO().id(URI.create("urn:ngsi-ld:sub-entity:entity-2")).type("sub-entity");
+		RelationshipVO subRel1 = new RelationshipVO()._object(subEntity1.getId());
+		RelationshipVO subRel2 = new RelationshipVO()._object(subEntity2.getId());
+
+		// entity-1 only has the legacy name in the data, entity-2 only has the primary name.
+		subRel1.setAdditionalProperties("legacy-name", new PropertyVO().value("sub-entity-1-legacy"));
+		subRel2.setAdditionalProperties("name", new PropertyVO().value("sub-entity-2"));
+		RelationshipListVO relationshipVOS = new RelationshipListVO();
+		relationshipVOS.add(subRel1);
+		relationshipVOS.add(subRel2);
+		parentEntity.setAdditionalProperties("mySubProperty", relationshipVOS);
+
+		MySubPropertyEntity expectedSub1 = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:entity-1");
+		expectedSub1.setMyName("sub-entity-1-legacy");
+		MySubPropertyEntity expectedSub2 = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:entity-2");
+		expectedSub2.setMyName("sub-entity-2");
+		MyPojoWithSubEntityListFrom expectedPojo = new MyPojoWithSubEntityListFrom("urn:ngsi-ld:complex-pojo:entity");
+		expectedPojo.setMySubProperty(List.of(expectedSub1, expectedSub2));
+
+		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityListFrom.class).block(),
+				"Each relationship in the list should independently fall back to the legacy name when the primary name is absent.");
 	}
 
 	@DisplayName("If the setter is broken, nothing should be constructed.")
