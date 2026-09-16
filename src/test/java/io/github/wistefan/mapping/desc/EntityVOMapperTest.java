@@ -123,6 +123,22 @@ class EntityVOMapperTest {
 		assertEquals(expectedPojo, myPojoWithUnmappedProperties, "The full pojo should be returned.");
 	}
 
+	@DisplayName("Map an entity with a property explicitly mapped (@AttributeSetter) to a reserved word. "
+			+ "Regression test: getCorrespondingSetterMethod used to compare the escaped broker key "
+			+ "(tmfEscaped-value) against the unescaped targetName (value), never matching, so the "
+			+ "property was silently dropped instead of reaching its setter.")
+	@Test
+	void testWithMappedPropertyNamedAsReservedWord() throws Exception {
+		MyPojoWithReservedWordProperty expectedPojo = new MyPojoWithReservedWordProperty("urn:ngsi-ld:my-pojo:the-entity");
+		expectedPojo.setMyValue("hello-world");
+
+		String entityString = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-entity\",\"type\":\"my-pojo\",\"tmfEscaped-value\":{\"value\":\"hello-world\",\"type\":\"Property\"}}";
+		EntityVO theEntity = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithReservedWordProperty actual = entityVOMapper.fromEntityVO(theEntity, MyPojoWithReservedWordProperty.class).block();
+		assertEquals(expectedPojo, actual, "The reserved-word property should have reached its explicit setter.");
+	}
+
 	@DisplayName("Map an entity with multiple not explicitly mapped properties.")
 	@Test
 	void testWithMultipleUnmappedProperties() throws Exception {

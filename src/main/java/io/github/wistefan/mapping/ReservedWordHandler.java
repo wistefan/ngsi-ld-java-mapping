@@ -70,7 +70,7 @@ public class ReservedWordHandler {
 	public static String removeEscape(String key) {
 		if (isReservedProperty(key)) {
 			var w = key.replaceFirst(ESCAPE_PREFIX, "");
-			log.info("Done {}", w);
+			log.debug("Replace {} with {}", key, w);
 			return w;
 		}
 		return key;
