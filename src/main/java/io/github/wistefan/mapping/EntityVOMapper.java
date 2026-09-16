@@ -646,7 +646,11 @@ public class EntityVOMapper extends Mapper {
 	 * @return a list of entity ids
 	 */
 	private List<URI> getEntityURIsByAttributeSetter(AttributeSetter attributeSetter, Map<String, AdditionalPropertyVO> propertiesMap) {
-		return Optional.ofNullable(propertiesMap.get(attributeSetter.targetName()))
+		// propertiesMap is keyed by the raw broker attribute name, which for a reserved word
+		// (e.g. "value") carries the escape prefix - re-apply it here so the lookup can actually
+		// find the entry, same issue as in getCorrespondingSetterMethod.
+		String key = ReservedWordHandler.escapeReservedWords(attributeSetter.targetName());
+		return Optional.ofNullable(propertiesMap.get(key))
 				.map(this::getURIsFromRelationshipObject)
 				.orElseGet(List::of);
 	}
@@ -868,11 +872,18 @@ public class EntityVOMapper extends Mapper {
 
 	/**
 	 * Get the setter method for the given property at the entity.
+	 *
+	 * <p>{@code propertyName} arrives as read from the broker, so it can still carry the
+	 * {@link ReservedWordHandler#escapeReservedWords escape prefix} for reserved words (e.g.
+	 * {@code tmfEscaped-value}), while {@link AttributeSetter#targetName()} is always declared
+	 * unescaped (e.g. {@code value}) - unescape before comparing, or a domain field mapped to a
+	 * reserved word never matches its setter and silently falls through to unmapped properties.
 	 */
 	private <T> Optional<Method> getCorrespondingSetterMethod(T entity, String propertyName) {
+		String unescapedPropertyName = ReservedWordHandler.removeEscape(propertyName);
 		return getAttributeSettersMethods(entity).stream().filter(m ->
 						getAttributeSetterAnnotation(m)
-								.map(attributeSetter -> attributeSetter.targetName().equals(propertyName)).orElse(false))
+								.map(attributeSetter -> attributeSetter.targetName().equals(unescapedPropertyName)).orElse(false))
 				.findFirst();
 	}
 
