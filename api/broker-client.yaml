@@ -1386,6 +1386,8 @@ components:
           format: uri
         title:
           type: string
+        status:
+          type: integer
         detail:
           type: string
       required:
@@ -1714,7 +1716,7 @@ components:
           items:
             type: string
             format: uri
-        error:
+        errors:
           type: array
           items:
             $ref: '#/components/schemas/BatchEntityError'
