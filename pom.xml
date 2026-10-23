@@ -259,11 +259,6 @@
         </resources>
         <plugins>
             <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>build-helper-maven-plugin</artifactId>
-                <version>${version.org.codehaus.mojo.build-helper-maven-plugin}</version>
-            </plugin>
-            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>${version.org.apache.maven.plugins.maven-compiler-plugin}</version>
@@ -464,6 +459,7 @@
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>build-helper-maven-plugin</artifactId>
+                <version>${version.org.codehaus.mojo.build-helper-maven-plugin}</version>
                 <executions>
                     <execution>
                         <id>openapi-sources</id>
