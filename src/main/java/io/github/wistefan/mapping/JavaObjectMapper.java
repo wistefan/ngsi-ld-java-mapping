@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -59,6 +60,13 @@ public class JavaObjectMapper extends Mapper {
 	 * be compacted to its scalar form on retrieval (JSON-LD compaction).
 	 */
 	private static final String LIST_ITEM_DATASET_ID_PREFIX = "urn:ngsi-ld:dataset:list-item:";
+
+	/**
+	 * The NGSI-LD Null sentinel, used as the value/object of a Property/Relationship instance
+	 * to signal that it (or the whole default attribute instance it belongs to) is to be
+	 * deleted. See ETSI GS CIM 009 clause 4.5.0.
+	 */
+	private static final String NGSI_LD_NULL = "urn:ngsi-ld:null";
 
 	private final MappingProperties mappingProperties;
 	private final ObjectMapper objectMapper;
@@ -195,6 +203,20 @@ public class JavaObjectMapper extends Mapper {
 	 * @return the NGSI-LD entity object
 	 */
 	public <T> EntityVO toEntityVO(T entity) {
+		return toEntityVO(entity, NgsiLdWriteOperation.CREATE);
+	}
+
+	/**
+	 * Translate the given java object into an NGSI-LD entity.
+	 *
+	 * @param entity         the object to be translated
+	 * @param writeOperation whether the result is meant for creating or updating the entity at
+	 *                       the broker - controls how a list-type attribute (Property or
+	 *                       Relationship) with no instances is represented, see
+	 *                       {@link NgsiLdWriteOperation}
+	 * @return the NGSI-LD entity object
+	 */
+	public <T> EntityVO toEntityVO(T entity, NgsiLdWriteOperation writeOperation) {
 		isMappingEnabled(entity.getClass())
 				.orElseThrow(() -> new UnsupportedOperationException(
 						String.format("Generic mapping to NGSI-LD entities is not supported for object %s",
@@ -248,11 +270,11 @@ public class JavaObjectMapper extends Mapper {
 		if (unmappedPropertiesGetterMethods.isEmpty()) {
 			return buildEntity(entity, entityIdMethod.get(0), entityTypeMethod.get(0), Optional.empty(), propertyMethods,
 					propertyListMethods,
-					geoPropertyMethods, relationshipMethods, relationshipListMethods);
+					geoPropertyMethods, relationshipMethods, relationshipListMethods, writeOperation);
 		} else {
 			return buildEntity(entity, entityIdMethod.get(0), entityTypeMethod.get(0), Optional.of(unmappedPropertiesGetterMethods.get(0)), propertyMethods,
 					propertyListMethods,
-					geoPropertyMethods, relationshipMethods, relationshipListMethods);
+					geoPropertyMethods, relationshipMethods, relationshipListMethods, writeOperation);
 		}
 	}
 
@@ -262,7 +284,8 @@ public class JavaObjectMapper extends Mapper {
 	private <T> EntityVO buildEntity(T entity, Method entityIdMethod, Method entityTypeMethod, Optional<Method> unmappedPropertiesMethod,
 									 List<Method> propertyMethods, List<Method> propertyListMethods,
 									 List<Method> geoPropertyMethods,
-									 List<Method> relationshipMethods, List<Method> relationshipListMethods) {
+									 List<Method> relationshipMethods, List<Method> relationshipListMethods,
+									 NgsiLdWriteOperation writeOperation) {
 
 		EntityVO entityVO = new EntityVO();
 		entityVO.setAtContext(mappingProperties.getContextUrl());
@@ -310,6 +333,29 @@ public class JavaObjectMapper extends Mapper {
 
 		additionalProperties.putAll(relationshipVOMap);
 		additionalProperties.putAll(relationshipListVOMap);
+
+		// NGSI-LD does not accept an attribute represented as an empty array - a list-type
+		// getter (PROPERTY_LIST/RELATIONSHIP_LIST) that returned no items shows up here as an
+		// empty PropertyListVO/RelationshipListVO. On create, there is nothing to delete, so the
+		// attribute is simply omitted. On update, it is represented as a single NGSI-LD Null
+		// instance, so the broker deletes the (default) attribute instance instead of rejecting
+		// an empty array.
+		Iterator<Map.Entry<String, AdditionalPropertyVO>> additionalPropertiesIterator = additionalProperties.entrySet().iterator();
+		while (additionalPropertiesIterator.hasNext()) {
+			Map.Entry<String, AdditionalPropertyVO> entry = additionalPropertiesIterator.next();
+			if (!(entry.getValue() instanceof List<?> multiAttribute) || !multiAttribute.isEmpty()) {
+				continue;
+			}
+			if (writeOperation == NgsiLdWriteOperation.CREATE) {
+				additionalPropertiesIterator.remove();
+			} else if (entry.getValue() instanceof PropertyListVO propertyListVO) {
+				propertyListVO.add(new PropertyVO().value(NGSI_LD_NULL));
+			} else if (entry.getValue() instanceof RelationshipListVO relationshipListVO) {
+				RelationshipVO nullRelationship = new RelationshipVO();
+				nullRelationship.setObject(URI.create(NGSI_LD_NULL));
+				relationshipListVO.add(nullRelationship);
+			}
+		}
 
 		additionalProperties.forEach(entityVO::setAdditionalProperties);
 
@@ -383,8 +429,8 @@ public class JavaObjectMapper extends Mapper {
 	}
 
 	private Map.Entry<String, AdditionalPropertyVO> unmappedPropertyToAdditionalProperty(UnmappedProperty unmappedProperty) {
-		AdditionalPropertyVO additionalPropertyVO = objectToAdditionalProperty(unmappedProperty.getValue());
-		return new AbstractMap.SimpleEntry<>(ReservedWordHandler.escapeReservedWords(unmappedProperty.getName()), additionalPropertyVO);
+		AdditionalPropertyVO additionalPropertyVO = objectToAdditionalProperty(unmappedProperty.getValue(), true);
+		return new AbstractMap.SimpleEntry<>(ReservedWordHandler.escapeUnmappedKey(unmappedProperty.getName()), additionalPropertyVO);
 
 	}
 
@@ -409,7 +455,16 @@ public class JavaObjectMapper extends Mapper {
 		return relationshipVO;
 	}
 
-	private List<?> listToEscapedMap(List<?> objectList) {
+	/**
+	 * Escape a key of a (nested) property value. Keys of unmapped properties starting with "@" are escaped as well,
+	 * see {@link ReservedWordHandler#escapeUnmappedKey(String)}. Typed attributes keep the plain reserved-word
+	 * escaping, since their nested keys are resolved by the target classes.
+	 */
+	private static String escapeKey(String key, boolean unmapped) {
+		return unmapped ? ReservedWordHandler.escapeUnmappedKey(key) : ReservedWordHandler.escapeReservedWords(key);
+	}
+
+	private List<?> listToEscapedMap(List<?> objectList, boolean unmapped) {
 		if (objectList == null || objectList.isEmpty()) {
 			return objectList;
 		}
@@ -417,28 +472,38 @@ public class JavaObjectMapper extends Mapper {
 			return objectList;
 		}
 		return objectList.stream()
-				.map(this::toEscapedMap)
+				.map(o -> toEscapedMap(o, unmapped))
 				.toList();
 	}
 
 	private Map<String, Object> toEscapedMap(Object o) {
+		return toEscapedMap(o, false);
+	}
+
+	private Map<String, Object> toEscapedMap(Object o, boolean unmapped) {
 		Map<String, Object> escapedMap = new HashMap<>();
 		Map<String, Object> unescapedMap = toMap(o);
 		unescapedMap.forEach((key, value) -> {
-            String escapedKey = ReservedWordHandler.escapeReservedWords(key);
+            String escapedKey = escapeKey(key, unmapped);
             if (value instanceof List valueList) {
-                escapedMap.put(escapedKey, listToEscapedMap(valueList));
+                escapedMap.put(escapedKey, listToEscapedMap(valueList, unmapped));
             } else if (isPlain(value)) {
                 escapedMap.put(escapedKey, value);
             } else {
-                escapedMap.put(escapedKey, toEscapedMap(value));
+                escapedMap.put(escapedKey, toEscapedMap(value, unmapped));
             }
         });
 		return escapedMap;
 	}
 
-
 	private AdditionalPropertyVO objectToAdditionalProperty(Object o) {
+		return objectToAdditionalProperty(o, false);
+	}
+
+	/**
+	 * @param unmapped whether the object is (part of) the value of an unmapped property
+	 */
+	private AdditionalPropertyVO objectToAdditionalProperty(Object o, boolean unmapped) {
 		if (o instanceof List<?> objectList && objectList.isEmpty()) {
 			// Preserve empty arrays as empty arrays on the wire.
 			// Without this, the empty list would fall through to the Map branch
@@ -470,7 +535,7 @@ public class JavaObjectMapper extends Mapper {
 				RelationshipListVO relationshipVOS = new RelationshipListVO();
 				// as of now, we don't support property lists of property lists
 				for (int i = 0; i < objectList.size(); i++) {
-					AdditionalPropertyVO apvo = objectToAdditionalProperty(objectList.get(i));
+					AdditionalPropertyVO apvo = objectToAdditionalProperty(objectList.get(i), unmapped);
 					URI datasetId = URI.create(LIST_ITEM_DATASET_ID_PREFIX + i);
 					if (apvo instanceof PropertyVO pvo) {
 						pvo.setDatasetId(datasetId);
@@ -519,11 +584,11 @@ public class JavaObjectMapper extends Mapper {
 					if (value instanceof List<?>) {
 						return;
 					}
-					propertyVO.setAdditionalProperties(ReservedWordHandler.escapeReservedWords(stringKey), objectToAdditionalProperty(value));
+					propertyVO.setAdditionalProperties(escapeKey(stringKey, unmapped), objectToAdditionalProperty(value, unmapped));
 				}
 
 			});
-			return propertyVO.value(toEscapedMap(objectMap));
+			return propertyVO.value(toEscapedMap(objectMap, unmapped));
 
 		}
 	}
