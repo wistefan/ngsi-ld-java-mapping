@@ -41,7 +41,7 @@
     <properties>
         <jdk.version>25</jdk.version>
         <release.version>25</release.version>
-        <micronaut.platform.version>5.1.3</micronaut.platform.version>
+        <micronaut.platform.version>5.2.3</micronaut.platform.version>
 
         <!-- project info -->
         <project.author.name>Stefan Wiedemann</project.author.name>
