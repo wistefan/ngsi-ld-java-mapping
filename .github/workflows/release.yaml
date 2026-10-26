@@ -55,7 +55,7 @@ jobs:
       - uses: actions/setup-java@v3
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 25
           cache: maven
           server-id: sonatype.org
           server-username: SONATYPE_ORG_USERNAME

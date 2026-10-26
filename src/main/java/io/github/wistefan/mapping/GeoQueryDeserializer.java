@@ -1,9 +1,9 @@
 package io.github.wistefan.mapping;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import org.fiware.ngsi.model.GeoQueryVO;
+import tools.jackson.core.JsonParser;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.deser.std.StdDeserializer;
 
 /**
  * Deserializer for GeoQuery
@@ -14,7 +14,7 @@ import org.fiware.ngsi.model.GeoQueryVO;
 public class GeoQueryDeserializer extends StdDeserializer<GeoQueryVO> {
 
     public GeoQueryDeserializer() {
-        this(null);
+        this(GeoQueryVO.class);
     }
 
     public GeoQueryDeserializer(final Class<?> vc) {
@@ -23,6 +23,8 @@ public class GeoQueryDeserializer extends StdDeserializer<GeoQueryVO> {
 
     @Override
     public GeoQueryVO deserialize(final JsonParser p, final DeserializationContext context) {
+        // consume the value, Jackson 3 fails on trailing tokens by default
+        p.skipChildren();
         return new GeoQueryVO();
     }
 

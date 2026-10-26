@@ -1,6 +1,6 @@
 package io.github.wistefan.mapping;
 
-import com.fasterxml.jackson.databind.module.SimpleModule;
+import tools.jackson.databind.module.SimpleModule;
 import jakarta.inject.Singleton;
 import org.fiware.ngsi.model.AdditionalPropertyVO;
 import org.fiware.ngsi.model.GeoQueryVO;

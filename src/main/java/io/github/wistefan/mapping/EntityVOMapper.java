@@ -1,8 +1,8 @@
 package io.github.wistefan.mapping;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import io.github.wistefan.mapping.annotations.*;
 import lombok.extern.slf4j.Slf4j;
 import org.fiware.ngsi.model.*;
@@ -174,7 +174,7 @@ public class EntityVOMapper extends Mapper {
 		return WELL_KNOWN_PROPERTIES.contains(propertyName);
 	}
 
-	public NotificationVO readNotificationFromJSON(String json) throws JsonProcessingException {
+	public NotificationVO readNotificationFromJSON(String json) throws JacksonException {
 		return objectMapper.readValue(json, NotificationVO.class);
 	}
 

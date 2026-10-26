@@ -1,7 +1,8 @@
 package io.github.wistefan.mapping;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.TokenStreamFactory;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import io.micronaut.context.ApplicationContext;
 import jakarta.inject.Singleton;
 import org.fiware.ngsi.model.EntityVO;
@@ -24,6 +25,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -34,6 +36,7 @@ class MappingContextTest {
 
 	private static final String NGSI_URL_PROPERTY = "micronaut.http.services.ngsi.url";
 	private static final String DUMMY_NGSI_URL = "http://localhost:1026";
+	private static final String CANONICALIZE_FEATURE_PROPERTY = "jackson.json-factory-features.canonicalize-property-names";
 
 	private static final String ESCAPED_KEY = "tmfEscaped-@context";
 	private static final String UNESCAPED_KEY = "@context";
@@ -71,7 +74,18 @@ class MappingContextTest {
 	@DisplayName("The context ObjectMapper uses the escape cleaning factory.")
 	@Test
 	void usesEscapeCleaningFactory() {
-		assertInstanceOf(EscapeCleaningJsonFactory.class, objectMapper.getFactory(), "The escape cleaning factory should be used.");
+		assertInstanceOf(EscapeCleaningJsonFactory.class, objectMapper.tokenStreamFactory(), "The escape cleaning factory should be used.");
+	}
+
+	@DisplayName("Configured json-factory-features are applied to the escape cleaning factory.")
+	@Test
+	void appliesJsonFactoryFeatures() {
+		try (ApplicationContext featureContext = ApplicationContext.run(
+				Map.of(NGSI_URL_PROPERTY, DUMMY_NGSI_URL, CANONICALIZE_FEATURE_PROPERTY, false))) {
+			TokenStreamFactory factory = featureContext.getBean(ObjectMapper.class).tokenStreamFactory();
+			assertInstanceOf(EscapeCleaningJsonFactory.class, factory, "The escape cleaning factory should be used.");
+			assertFalse(factory.isEnabled(TokenStreamFactory.Feature.CANONICALIZE_PROPERTY_NAMES), "The configured feature should be disabled.");
+		}
 	}
 
 	@DisplayName("Escaped reserved keys are unescaped during parsing.")
