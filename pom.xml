@@ -100,6 +100,7 @@
         <version.org.apache.maven.plugins.maven-javadoc-plugin>3.2.0
         </version.org.apache.maven.plugins.maven-javadoc-plugin>
         <version.org.apache.maven.plugins.maven-compiler-plugin>3.14.0</version.org.apache.maven.plugins.maven-compiler-plugin>
+        <version.org.apache.maven.plugins.maven-antrun-plugin>3.1.0</version.org.apache.maven.plugins.maven-antrun-plugin>
         <version.com.google.code.findbugs.jsr305>3.0.2</version.com.google.code.findbugs.jsr305>
         <coveralls.token>myToken</coveralls.token>
         <jacoco.reportFolder>${project.build.directory}/jacoco/${artifactId}</jacoco.reportFolder>
@@ -291,6 +292,36 @@
                     </execution>
                 </executions>
             </plugin>
+            <!-- The generator annotates the reserved-word property `object` of RelationshipVO with @JsonProperty on the
+                 private field `_object`. Micronaut maps that to @Introspected.Property, and since the field name matches no
+                 accessor, it stays a field property - which the introspection processor rejects for the default visibility.
+                 Widening the visibility of the generated @Introspected keeps bean introspection available for all VOs.
+                 Custom codegen templates are no option: MicronautCodegen#processOpts overwrites `templateDir`. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>${version.org.apache.maven.plugins.maven-antrun-plugin}</version>
+                <executions>
+                    <execution>
+                        <id>widen-introspection-visibility</id>
+                        <phase>process-sources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <replace dir="${project.build.directory}/generated-sources/openapi/org/fiware/ngsi/model"
+                                         includes="*.java">
+                                    <replacetoken><![CDATA[@io.micronaut.core.annotation.Introspected
+]]></replacetoken>
+                                    <replacevalue><![CDATA[@io.micronaut.core.annotation.Introspected(visibility = io.micronaut.core.annotation.Introspected.Visibility.ANY)
+]]></replacevalue>
+                                </replace>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <!-- run tests -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -396,9 +427,7 @@
                                 <useOptional>false</useOptional>
                                 <useGenericResponse>true</useGenericResponse>
                                 <useLombokGenerated>true</useLombokGenerated>
-                                <!-- Micronaut 5 rejects introspecting RelationshipVO: its private field `_object` matches no
-                                     getter (getObject()) and fails compilation. Renaming it would break the public `_object(..)` fluent setter. -->
-                                <introspected>false</introspected>
+                                <introspected>true</introspected>
                                 <generateAliasAsModel>false</generateAliasAsModel>
                                 <useBeanValidation>false</useBeanValidation>
                                 <jacksonDatabindNullable>false</jacksonDatabindNullable>

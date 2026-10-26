@@ -9,7 +9,6 @@ import org.fiware.ngsi.model.*;
 import reactor.core.publisher.Mono;
 
 import jakarta.inject.Singleton;
-import javax.swing.undo.UndoManager;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -35,9 +34,25 @@ public class EntityVOMapper extends Mapper {
 	private final EntitiesRepository entitiesRepository;
 
 	public EntityVOMapper(MappingProperties mappingProperties, ObjectMapper objectMapper, EntitiesRepository entitiesRepository) {
+		requireMappingModule(objectMapper);
 		this.mappingProperties = mappingProperties;
 		this.objectMapper = objectMapper;
 		this.entitiesRepository = entitiesRepository;
+	}
+
+	/**
+	 * The mapper relies on the Jackson customisations of {@link NgsiLdMappingModule}. Without them, deserialization of
+	 * {@link AdditionalPropertyVO} fails with a type-id error that does not point at the actual cause, therefore the
+	 * missing module is reported on construction.
+	 */
+	private static void requireMappingModule(ObjectMapper objectMapper) {
+		boolean moduleRegistered = objectMapper.registeredModules().stream()
+				.anyMatch(module -> NgsiLdMappingModule.MODULE_NAME.equals(module.getModuleName()));
+		if (!moduleRegistered) {
+			throw new IllegalStateException(String.format(
+					"The provided ObjectMapper does not have the %s registered. Either use the ObjectMapper provided by Micronaut or register the module manually.",
+					NgsiLdMappingModule.MODULE_NAME));
+		}
 	}
 
 	/**

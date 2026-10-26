@@ -48,6 +48,17 @@ class EntityVOMapperTest {
 		entityVOMapper = new EntityVOMapper(mappingProperties, OBJECT_MAPPER, entitiesRepository);
 	}
 
+	@DisplayName("Creating the mapper with an ObjectMapper missing the NgsiLdMappingModule fails fast.")
+	@Test
+	void testMissingMappingModule() {
+		ObjectMapper plainObjectMapper = JsonMapper.builder().build();
+
+		IllegalStateException illegalStateException = assertThrows(IllegalStateException.class,
+				() -> new EntityVOMapper(mappingProperties, plainObjectMapper, entitiesRepository));
+		assertTrue(illegalStateException.getMessage().contains(NgsiLdMappingModule.MODULE_NAME),
+				"The exception should name the missing module.");
+	}
+
 	@DisplayName("Map entity containing a relationship.")
 	@Test
 	void testSubEntityMapping() throws JacksonException {

@@ -12,7 +12,8 @@ import org.fiware.ngsi.model.GeoQueryVO;
 @Singleton
 public class NgsiLdMappingModule extends SimpleModule {
 
-	private static final String MODULE_NAME = "NgsiLdMappingModule";
+	/** Name the module is registered with, used to verify its presence on a given ObjectMapper. */
+	public static final String MODULE_NAME = "NgsiLdMappingModule";
 
 	public NgsiLdMappingModule() {
 		super(MODULE_NAME);

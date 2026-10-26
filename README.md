@@ -18,7 +18,7 @@ provided, that needs to be used for describing the object mappings.
 Since version 2.0.0, the library requires:
 
 - Java 25
-- Micronaut 5.x (platform 5.1.3 or newer)
+- Micronaut 5.x (platform 5.2.3 or newer)
 - Jackson 3 (`tools.jackson`)
 
 All three are `provided` dependencies, so your application has to supply them. Applications on Micronaut 4 or
@@ -26,7 +26,9 @@ Jackson 2 have to stay on the 1.x releases.
 
 The library does not modify the application's `ObjectMapper`. Its Jackson customisations live in the
 `NgsiLdMappingModule` bean, which Micronaut registers automatically. A hand-built `ObjectMapper` has to register
-the module itself. Jackson 3 changed some defaults. To get the 1.x behaviour back, set:
+the module itself - `EntityVOMapper` rejects an `ObjectMapper` without it at construction time.
+
+Jackson 3 changed some defaults. To get the 1.x behaviour back, set:
 
 ```yaml
 jackson:

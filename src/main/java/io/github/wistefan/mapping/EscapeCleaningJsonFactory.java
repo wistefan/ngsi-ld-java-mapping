@@ -53,12 +53,9 @@ public class EscapeCleaningJsonFactory extends JsonFactory {
 		return new EscapeCleaningJsonFactory(this);
 	}
 
-	/**
-	 * Not supported: {@link JsonFactoryBuilder} can only build a plain JsonFactory, which would drop escape cleaning.
-	 */
 	@Override
-	public JsonFactoryBuilder rebuild() {
-		throw new UnsupportedOperationException("EscapeCleaningJsonFactory cannot be rebuilt, use copy() instead.");
+	public Builder rebuild() {
+		return new Builder(this);
 	}
 
 	@Override
@@ -90,5 +87,21 @@ public class EscapeCleaningJsonFactory extends JsonFactory {
 	@Override
 	protected JsonParser _createParser(ObjectReadContext readCtxt, IOContext ioCtxt, DataInput input) {
 		return new EscapeCleaningParser(super._createParser(readCtxt, ioCtxt, input));
+	}
+
+	/**
+	 * Builder preserving the factory type, so that {@link #rebuild()} does not fall back to a plain JsonFactory
+	 * without escape cleaning.
+	 */
+	public static class Builder extends JsonFactoryBuilder {
+
+		protected Builder(JsonFactory base) {
+			super(base);
+		}
+
+		@Override
+		public EscapeCleaningJsonFactory build() {
+			return new EscapeCleaningJsonFactory(this);
+		}
 	}
 }
