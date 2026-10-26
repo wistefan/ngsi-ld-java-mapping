@@ -396,6 +396,8 @@
                                 <useOptional>false</useOptional>
                                 <useGenericResponse>true</useGenericResponse>
                                 <useLombokGenerated>true</useLombokGenerated>
+                                <!-- Micronaut 5 rejects introspecting RelationshipVO: its private field `_object` matches no
+                                     getter (getObject()) and fails compilation. Renaming it would break the public `_object(..)` fluent setter. -->
                                 <introspected>false</introspected>
                                 <generateAliasAsModel>false</generateAliasAsModel>
                                 <useBeanValidation>false</useBeanValidation>
