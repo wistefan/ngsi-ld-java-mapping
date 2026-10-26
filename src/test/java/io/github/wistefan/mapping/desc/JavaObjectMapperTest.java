@@ -2,6 +2,7 @@ package io.github.wistefan.mapping.desc;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import io.github.wistefan.mapping.*;
@@ -251,10 +252,10 @@ class JavaObjectMapperTest {
 				"A pojo with a null relationship list should be mapped.");
 	}
 
-	@DisplayName("Pojo with null entry in relationship-list should be mapped.")
+	@DisplayName("Pojo with null entry in relationship-list should be mapped, omitting the empty list on create.")
 	@Test
 	void testWithNullInRelList() throws JsonProcessingException {
-		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:entity:the-entity\",\"type\":\"complex-pojo\",\"sub-entity\":[]}";
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:entity:the-entity\",\"type\":\"complex-pojo\"}";
 		MyPojoWithListOfSubEntity myPojoWithListOfSubEntity = new MyPojoWithListOfSubEntity(
 				"urn:ngsi-ld:entity:the-entity");
 		List<MySubPropertyEntity> listWithNull = new ArrayList<>();
@@ -262,7 +263,71 @@ class JavaObjectMapperTest {
 		myPojoWithListOfSubEntity.setMySubProperty(listWithNull);
 		assertEquals(expectedJson,
 				OBJECT_MAPPER.writeValueAsString(javaObjectMapper.toEntityVO(myPojoWithListOfSubEntity)),
-				"A pojo with a null entry in the relationship list should be mapped.");
+				"A pojo with a null entry in the relationship list should be mapped without the (empty) list.");
+	}
+
+	@DisplayName("An empty relationship-list is omitted on create.")
+	@Test
+	void testEmptyRelListIsOmittedOnCreate() throws JsonProcessingException {
+		MyPojoWithListOfSubEntity myPojoWithListOfSubEntity = new MyPojoWithListOfSubEntity(
+				"urn:ngsi-ld:entity:the-entity");
+		myPojoWithListOfSubEntity.setMySubProperty(new ArrayList<>());
+
+		JsonNode entity = OBJECT_MAPPER.readTree(OBJECT_MAPPER.writeValueAsString(
+				javaObjectMapper.toEntityVO(myPojoWithListOfSubEntity, MappingContext.CREATE)));
+
+		assertFalse(entity.has("sub-entity"), "An empty list attribute must not be sent on create.");
+	}
+
+	@DisplayName("An empty relationship-list is sent as NGSI-LD Null on update, so the broker deletes it.")
+	@Test
+	void testEmptyRelListIsNullOnUpdate() throws JsonProcessingException {
+		MyPojoWithListOfSubEntity myPojoWithListOfSubEntity = new MyPojoWithListOfSubEntity(
+				"urn:ngsi-ld:entity:the-entity");
+		myPojoWithListOfSubEntity.setMySubProperty(new ArrayList<>());
+
+		JsonNode entity = OBJECT_MAPPER.readTree(OBJECT_MAPPER.writeValueAsString(
+				javaObjectMapper.toEntityVO(myPojoWithListOfSubEntity, MappingContext.UPDATE)));
+
+		JsonNode attribute = entity.get("sub-entity");
+		assertNotNull(attribute, "The empty list attribute has to be sent on update.");
+		JsonNode instance = attribute.isArray() ? attribute.get(0) : attribute;
+		assertEquals(1, attribute.isArray() ? attribute.size() : 1, "Exactly one Null instance should be sent.");
+		assertEquals("Relationship", instance.get("type").asText());
+		assertEquals("urn:ngsi-ld:null", instance.get("object").asText(), "The instance should carry the NGSI-LD Null.");
+	}
+
+	@DisplayName("An empty property-list is omitted on create and sent as NGSI-LD Null on update.")
+	@Test
+	void testEmptyPropertyListOnCreateAndUpdate() throws JsonProcessingException {
+		MyPojoWithListOfSubProperty pojo = new MyPojoWithListOfSubProperty("urn:ngsi-ld:entity:the-entity");
+		pojo.setMySubProperties(new ArrayList<>());
+
+		JsonNode created = OBJECT_MAPPER.readTree(OBJECT_MAPPER.writeValueAsString(
+				javaObjectMapper.toEntityVO(pojo, MappingContext.CREATE)));
+		assertFalse(created.has("mySubProperty"), "An empty list attribute must not be sent on create.");
+
+		JsonNode updated = OBJECT_MAPPER.readTree(OBJECT_MAPPER.writeValueAsString(
+				javaObjectMapper.toEntityVO(pojo, MappingContext.UPDATE)));
+		JsonNode attribute = updated.get("mySubProperty");
+		assertNotNull(attribute, "The empty list attribute has to be sent on update.");
+		JsonNode instance = attribute.isArray() ? attribute.get(0) : attribute;
+		assertEquals(1, attribute.isArray() ? attribute.size() : 1, "Exactly one Null instance should be sent.");
+		assertEquals("Property", instance.get("type").asText());
+		assertEquals("urn:ngsi-ld:null", instance.get("value").asText(), "The instance should carry the NGSI-LD Null.");
+	}
+
+	@DisplayName("The one-argument toEntityVO keeps the create behaviour.")
+	@Test
+	void testDefaultContextIsCreate() throws JsonProcessingException {
+		MyPojoWithListOfSubEntity myPojoWithListOfSubEntity = new MyPojoWithListOfSubEntity(
+				"urn:ngsi-ld:entity:the-entity");
+		myPojoWithListOfSubEntity.setMySubProperty(new ArrayList<>());
+
+		assertEquals(
+				OBJECT_MAPPER.writeValueAsString(javaObjectMapper.toEntityVO(myPojoWithListOfSubEntity, MappingContext.CREATE)),
+				OBJECT_MAPPER.writeValueAsString(javaObjectMapper.toEntityVO(myPojoWithListOfSubEntity)),
+				"Existing callers of toEntityVO(entity) should get the create behaviour.");
 	}
 
 	@DisplayName("Pojo with sub-entity with invalid dataset id should not be mapped.")
