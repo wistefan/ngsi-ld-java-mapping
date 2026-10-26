@@ -1,10 +1,10 @@
 package io.github.wistefan.mapping.desc;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import io.github.wistefan.mapping.*;
 import io.github.wistefan.mapping.desc.pojos.MyPojoWithUnmappedProperties;
-import org.fiware.ngsi.model.AdditionalPropertyVO;
 import org.fiware.ngsi.model.EntityVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -22,9 +22,11 @@ import static org.mockito.Mockito.mock;
  */
 class AtPrefixedUnmappedKeysTest {
 
-	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new EscapeCleaningJsonFactory());
+	private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder(new EscapeCleaningJsonFactory())
+			.addModule(new NgsiLdMappingModule())
+			.build();
 	// inspects the json as sent to the broker - the EscapeCleaningJsonFactory would already unescape while parsing
-	private static final ObjectMapper RAW_MAPPER = new ObjectMapper();
+	private static final ObjectMapper RAW_MAPPER = JsonMapper.builder().build();
 	private static final String ENTITY_ID = "urn:ngsi-ld:my-pojo:the-entity";
 
 	private JavaObjectMapper javaObjectMapper;
@@ -32,8 +34,7 @@ class AtPrefixedUnmappedKeysTest {
 
 	@BeforeEach
 	public void setup() {
-		OBJECT_MAPPER.addMixIn(AdditionalPropertyVO.class, AdditionalPropertyMixin.class);
-		javaObjectMapper = new JavaObjectMapper(new MappingProperties(), new ObjectMapper());
+		javaObjectMapper = new JavaObjectMapper(new MappingProperties(), JsonMapper.builder().build());
 		entityVOMapper = new EntityVOMapper(new MappingProperties(), OBJECT_MAPPER, mock(EntitiesRepository.class));
 	}
 
@@ -57,11 +58,11 @@ class AtPrefixedUnmappedKeysTest {
 	private static List<String> atPrefixedNames(JsonNode node) {
 		List<String> found = new ArrayList<>();
 		if (node.isObject()) {
-			node.fields().forEachRemaining(field -> {
-				if (field.getKey().startsWith("@") && !field.getKey().equals("@context")) {
-					found.add(field.getKey());
+			node.forEachEntry((name, value) -> {
+				if (name.startsWith("@") && !name.equals("@context")) {
+					found.add(name);
 				}
-				found.addAll(atPrefixedNames(field.getValue()));
+				found.addAll(atPrefixedNames(value));
 			});
 		} else if (node.isArray()) {
 			node.forEach(item -> found.addAll(atPrefixedNames(item)));

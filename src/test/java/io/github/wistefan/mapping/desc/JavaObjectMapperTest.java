@@ -2,6 +2,7 @@ package io.github.wistefan.mapping.desc;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.MapperFeature;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.SerializationFeature;
@@ -256,7 +257,7 @@ class JavaObjectMapperTest {
 	@DisplayName("Pojo with null entry in relationship-list should be mapped, omitting the empty list on create.")
 	@Test
 	void testWithNullInRelList() throws JacksonException {
-		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:entity:the-entity\",\"type\":\"complex-pojo\",\"sub-entity\":[]}";
+		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:entity:the-entity\",\"type\":\"complex-pojo\"}";
 		MyPojoWithListOfSubEntity myPojoWithListOfSubEntity = new MyPojoWithListOfSubEntity(
 				"urn:ngsi-ld:entity:the-entity");
 		List<MySubPropertyEntity> listWithNull = new ArrayList<>();
@@ -269,7 +270,7 @@ class JavaObjectMapperTest {
 
 	@DisplayName("An empty relationship-list is omitted on create.")
 	@Test
-	void testEmptyRelListIsOmittedOnCreate() throws JsonProcessingException {
+	void testEmptyRelListIsOmittedOnCreate() throws JacksonException {
 		MyPojoWithListOfSubEntity myPojoWithListOfSubEntity = new MyPojoWithListOfSubEntity(
 				"urn:ngsi-ld:entity:the-entity");
 		myPojoWithListOfSubEntity.setMySubProperty(new ArrayList<>());
@@ -282,7 +283,7 @@ class JavaObjectMapperTest {
 
 	@DisplayName("An empty relationship-list is sent as NGSI-LD Null on update, so the broker deletes it.")
 	@Test
-	void testEmptyRelListIsNullOnUpdate() throws JsonProcessingException {
+	void testEmptyRelListIsNullOnUpdate() throws JacksonException {
 		MyPojoWithListOfSubEntity myPojoWithListOfSubEntity = new MyPojoWithListOfSubEntity(
 				"urn:ngsi-ld:entity:the-entity");
 		myPojoWithListOfSubEntity.setMySubProperty(new ArrayList<>());
@@ -294,13 +295,13 @@ class JavaObjectMapperTest {
 		assertNotNull(attribute, "The empty list attribute has to be sent on update.");
 		JsonNode instance = attribute.isArray() ? attribute.get(0) : attribute;
 		assertEquals(1, attribute.isArray() ? attribute.size() : 1, "Exactly one Null instance should be sent.");
-		assertEquals("Relationship", instance.get("type").asText());
-		assertEquals("urn:ngsi-ld:null", instance.get("object").asText(), "The instance should carry the NGSI-LD Null.");
+		assertEquals("Relationship", instance.get("type").asString());
+		assertEquals("urn:ngsi-ld:null", instance.get("object").asString(), "The instance should carry the NGSI-LD Null.");
 	}
 
 	@DisplayName("An empty property-list is omitted on create and sent as NGSI-LD Null on update.")
 	@Test
-	void testEmptyPropertyListOnCreateAndUpdate() throws JsonProcessingException {
+	void testEmptyPropertyListOnCreateAndUpdate() throws JacksonException {
 		MyPojoWithListOfSubProperty pojo = new MyPojoWithListOfSubProperty("urn:ngsi-ld:entity:the-entity");
 		pojo.setMySubProperties(new ArrayList<>());
 
@@ -314,13 +315,13 @@ class JavaObjectMapperTest {
 		assertNotNull(attribute, "The empty list attribute has to be sent on update.");
 		JsonNode instance = attribute.isArray() ? attribute.get(0) : attribute;
 		assertEquals(1, attribute.isArray() ? attribute.size() : 1, "Exactly one Null instance should be sent.");
-		assertEquals("Property", instance.get("type").asText());
-		assertEquals("urn:ngsi-ld:null", instance.get("value").asText(), "The instance should carry the NGSI-LD Null.");
+		assertEquals("Property", instance.get("type").asString());
+		assertEquals("urn:ngsi-ld:null", instance.get("value").asString(), "The instance should carry the NGSI-LD Null.");
 	}
 
 	@DisplayName("The one-argument toEntityVO keeps the create behaviour.")
 	@Test
-	void testDefaultContextIsCreate() throws JsonProcessingException {
+	void testDefaultContextIsCreate() throws JacksonException {
 		MyPojoWithListOfSubEntity myPojoWithListOfSubEntity = new MyPojoWithListOfSubEntity(
 				"urn:ngsi-ld:entity:the-entity");
 		myPojoWithListOfSubEntity.setMySubProperty(new ArrayList<>());
