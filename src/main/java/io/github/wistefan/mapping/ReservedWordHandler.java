@@ -39,6 +39,12 @@ public class ReservedWordHandler {
 	private static final String ESCAPE_PREFIX = "tmfEscaped-";
 
 	/**
+	 * Leading character of JSON-LD/TMForum meta keys, e.g. {@code @referredType}. NGSI-LD does not allow member
+	 * names starting with it (ETSI GS CIM 009 clause 4.6.2).
+	 */
+	private static final String AT_SIGN = "@";
+
+	/**
 	 * Escape reserved words in keys.
 	 *
 	 * @param key the key to escape
@@ -46,6 +52,22 @@ public class ReservedWordHandler {
 	 */
 	public static String escapeReservedWords(String key) {
 		if (RESERVED_WORDS.contains(key)) {
+			return String.format("%s%s", ESCAPE_PREFIX, key);
+		}
+		return key;
+	}
+
+	/**
+	 * Escape a key of an unmapped (free-form) property before it is sent to the broker. In addition to the
+	 * reserved words, every key starting with "@" (e.g. {@code @referredType}) gets the {@link #ESCAPE_PREFIX}.
+	 * The escape is reverted by {@link #removeEscape(String)}, like for the reserved words.
+	 * Only to be used for unmapped properties: typed attributes are resolved by their configured names.
+	 *
+	 * @param key the key to escape
+	 * @return the key to be used at the broker
+	 */
+	public static String escapeUnmappedKey(String key) {
+		if (RESERVED_WORDS.contains(key) || key.startsWith(AT_SIGN)) {
 			return String.format("%s%s", ESCAPE_PREFIX, key);
 		}
 		return key;
