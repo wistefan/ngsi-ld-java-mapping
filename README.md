@@ -13,6 +13,31 @@ like [jackson](https://github.com/FasterXML/jackson) for JSON-Java,
 annotation-based approach. A set of specific [annotations](src/main/java/io/github/wistefan/mapping/annotations) is
 provided, that needs to be used for describing the object mappings.
 
+## Requirements
+
+Since version 2.0.0, the library requires:
+
+- Java 25
+- Micronaut 5.x (platform 5.1.3 or newer)
+- Jackson 3 (`tools.jackson`)
+
+All three are `provided` dependencies, so your application has to supply them. Applications on Micronaut 4 or
+Jackson 2 have to stay on the 1.x releases.
+
+The library does not modify the application's `ObjectMapper`. Its Jackson customisations live in the
+`NgsiLdMappingModule` bean, which Micronaut registers automatically. A hand-built `ObjectMapper` has to register
+the module itself. Jackson 3 changed some defaults. To get the 1.x behaviour back, set:
+
+```yaml
+jackson:
+  mapper-features:
+    sort-properties-alphabetically: false
+  deserialization-features:
+    fail-on-null-for-primitives: false
+  date-time-features:
+    write-dates-as-timestamps: true
+```
+
 ## Usage
 
 In order to enable the mappers to translate correctly between both worlds, the domain object has to be annotated
