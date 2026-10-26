@@ -429,8 +429,8 @@ public class JavaObjectMapper extends Mapper {
 	}
 
 	private Map.Entry<String, AdditionalPropertyVO> unmappedPropertyToAdditionalProperty(UnmappedProperty unmappedProperty) {
-		AdditionalPropertyVO additionalPropertyVO = objectToAdditionalProperty(unmappedProperty.getValue());
-		return new AbstractMap.SimpleEntry<>(ReservedWordHandler.escapeReservedWords(unmappedProperty.getName()), additionalPropertyVO);
+		AdditionalPropertyVO additionalPropertyVO = objectToAdditionalProperty(unmappedProperty.getValue(), true);
+		return new AbstractMap.SimpleEntry<>(ReservedWordHandler.escapeUnmappedKey(unmappedProperty.getName()), additionalPropertyVO);
 
 	}
 
@@ -455,7 +455,16 @@ public class JavaObjectMapper extends Mapper {
 		return relationshipVO;
 	}
 
-	private List<?> listToEscapedMap(List<?> objectList) {
+	/**
+	 * Escape a key of a (nested) property value. Keys of unmapped properties starting with "@" are escaped as well,
+	 * see {@link ReservedWordHandler#escapeUnmappedKey(String)}. Typed attributes keep the plain reserved-word
+	 * escaping, since their nested keys are resolved by the target classes.
+	 */
+	private static String escapeKey(String key, boolean unmapped) {
+		return unmapped ? ReservedWordHandler.escapeUnmappedKey(key) : ReservedWordHandler.escapeReservedWords(key);
+	}
+
+	private List<?> listToEscapedMap(List<?> objectList, boolean unmapped) {
 		if (objectList == null || objectList.isEmpty()) {
 			return objectList;
 		}
@@ -463,28 +472,38 @@ public class JavaObjectMapper extends Mapper {
 			return objectList;
 		}
 		return objectList.stream()
-				.map(this::toEscapedMap)
+				.map(o -> toEscapedMap(o, unmapped))
 				.toList();
 	}
 
 	private Map<String, Object> toEscapedMap(Object o) {
+		return toEscapedMap(o, false);
+	}
+
+	private Map<String, Object> toEscapedMap(Object o, boolean unmapped) {
 		Map<String, Object> escapedMap = new HashMap<>();
 		Map<String, Object> unescapedMap = toMap(o);
 		unescapedMap.forEach((key, value) -> {
-            String escapedKey = ReservedWordHandler.escapeReservedWords(key);
+            String escapedKey = escapeKey(key, unmapped);
             if (value instanceof List valueList) {
-                escapedMap.put(escapedKey, listToEscapedMap(valueList));
+                escapedMap.put(escapedKey, listToEscapedMap(valueList, unmapped));
             } else if (isPlain(value)) {
                 escapedMap.put(escapedKey, value);
             } else {
-                escapedMap.put(escapedKey, toEscapedMap(value));
+                escapedMap.put(escapedKey, toEscapedMap(value, unmapped));
             }
         });
 		return escapedMap;
 	}
 
-
 	private AdditionalPropertyVO objectToAdditionalProperty(Object o) {
+		return objectToAdditionalProperty(o, false);
+	}
+
+	/**
+	 * @param unmapped whether the object is (part of) the value of an unmapped property
+	 */
+	private AdditionalPropertyVO objectToAdditionalProperty(Object o, boolean unmapped) {
 		if (o instanceof List<?> objectList && objectList.isEmpty()) {
 			// Preserve empty arrays as empty arrays on the wire.
 			// Without this, the empty list would fall through to the Map branch
@@ -516,7 +535,7 @@ public class JavaObjectMapper extends Mapper {
 				RelationshipListVO relationshipVOS = new RelationshipListVO();
 				// as of now, we don't support property lists of property lists
 				for (int i = 0; i < objectList.size(); i++) {
-					AdditionalPropertyVO apvo = objectToAdditionalProperty(objectList.get(i));
+					AdditionalPropertyVO apvo = objectToAdditionalProperty(objectList.get(i), unmapped);
 					URI datasetId = URI.create(LIST_ITEM_DATASET_ID_PREFIX + i);
 					if (apvo instanceof PropertyVO pvo) {
 						pvo.setDatasetId(datasetId);
@@ -565,11 +584,11 @@ public class JavaObjectMapper extends Mapper {
 					if (value instanceof List<?>) {
 						return;
 					}
-					propertyVO.setAdditionalProperties(ReservedWordHandler.escapeReservedWords(stringKey), objectToAdditionalProperty(value));
+					propertyVO.setAdditionalProperties(escapeKey(stringKey, unmapped), objectToAdditionalProperty(value, unmapped));
 				}
 
 			});
-			return propertyVO.value(toEscapedMap(objectMap));
+			return propertyVO.value(toEscapedMap(objectMap, unmapped));
 
 		}
 	}
