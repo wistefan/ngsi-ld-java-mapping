@@ -1,11 +1,14 @@
 package io.github.wistefan.mapping;
 
-import com.fasterxml.jackson.databind.DeserializationConfig;
-import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.jsontype.NamedType;
-import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
-import com.fasterxml.jackson.databind.jsontype.impl.StdTypeResolverBuilder;
-import com.fasterxml.jackson.databind.jsontype.impl.TypeNameIdResolver;
+import org.fiware.ngsi.model.AdditionalPropertyObjectVO;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.JavaType;
+import tools.jackson.databind.SerializationContext;
+import tools.jackson.databind.jsontype.NamedType;
+import tools.jackson.databind.jsontype.TypeDeserializer;
+import tools.jackson.databind.jsontype.TypeSerializer;
+import tools.jackson.databind.jsontype.impl.StdTypeResolverBuilder;
+import tools.jackson.databind.jsontype.impl.TypeNameIdResolver;
 
 import java.util.Collection;
 
@@ -20,17 +23,22 @@ public class AdditionalPropertyTypeResolver extends StdTypeResolverBuilder {
 	public static final String NGSI_LD_TYPE_PROPERTY_NAME = "type";
 
 	@Override
-	public TypeDeserializer buildTypeDeserializer(DeserializationConfig config, JavaType baseType, Collection<NamedType> subtypes) {
+	public TypeDeserializer buildTypeDeserializer(DeserializationContext ctxt, JavaType baseType, Collection<NamedType> subtypes) {
 		return new AdditionalPropertyDeserializer(
 				baseType,
 				// normal type-to-name resolver is sufficient
-				TypeNameIdResolver.construct(config, baseType, subtypes, false, true),
+				TypeNameIdResolver.construct(ctxt.getConfig(), baseType, subtypes, false, true),
 				// per ngsi-ld, the type is in the type-property
 				NGSI_LD_TYPE_PROPERTY_NAME,
 				false,
 				// hopefully never needed, but default behaviour is sufficient
-				defineDefaultImpl(config, baseType));
+				defineDefaultImpl(ctxt, baseType),
+				ctxt.constructType(AdditionalPropertyObjectVO.class));
 	}
 
-
+	@Override
+	public TypeSerializer buildTypeSerializer(SerializationContext ctxt, JavaType baseType, Collection<NamedType> subtypes) {
+		// no type id is written, the concrete VOs already carry their type
+		return null;
+	}
 }

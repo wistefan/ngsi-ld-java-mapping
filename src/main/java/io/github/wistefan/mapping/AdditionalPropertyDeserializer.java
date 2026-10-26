@@ -1,20 +1,18 @@
 package io.github.wistefan.mapping;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonToken;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.util.TokenBuffer;
-import com.fasterxml.jackson.databind.jsontype.TypeIdResolver;
-import com.fasterxml.jackson.databind.jsontype.impl.AsArrayTypeDeserializer;
-import com.fasterxml.jackson.databind.jsontype.impl.AsPropertyTypeDeserializer;
-import com.fasterxml.jackson.databind.type.TypeFactory;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import org.fiware.ngsi.model.*;
+import tools.jackson.core.JsonParser;
+import tools.jackson.core.JsonToken;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.JavaType;
+import tools.jackson.databind.jsontype.TypeIdResolver;
+import tools.jackson.databind.jsontype.impl.AsArrayTypeDeserializer;
+import tools.jackson.databind.jsontype.impl.AsPropertyTypeDeserializer;
+import tools.jackson.databind.util.TokenBuffer;
 
 import java.util.Set;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,19 +29,24 @@ public class AdditionalPropertyDeserializer extends AsArrayTypeDeserializer {
 	 */
 	private final AsPropertyTypeDeserializer additionalPropertyObjectDeser;
 
-	public AdditionalPropertyDeserializer(JavaType bt, TypeIdResolver idRes, String typePropertyName, boolean typeIdVisible, JavaType defaultImpl) {
+	/**
+	 * @param objectType the type of {@link AdditionalPropertyObjectVO}, used for the individual objects
+	 */
+	public AdditionalPropertyDeserializer(JavaType bt, TypeIdResolver idRes, String typePropertyName, boolean typeIdVisible, JavaType defaultImpl, JavaType objectType) {
 		super(bt, idRes, typePropertyName, typeIdVisible, defaultImpl);
 		additionalPropertyObjectDeser = new AsPropertyTypeDeserializer(
-				TypeFactory.defaultInstance().constructType(new TypeReference<AdditionalPropertyObjectVO>() {}),
+				objectType,
 				idRes,
 				AdditionalPropertyTypeResolver.NGSI_LD_TYPE_PROPERTY_NAME,
 				false,
-				defaultImpl);
+				defaultImpl,
+				JsonTypeInfo.As.PROPERTY,
+				true);
 
 	}
 
 	@Override
-	protected Object _deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+	protected Object _deserialize(JsonParser p, DeserializationContext ctxt) {
 
 		// default behaviour
 		if (p.canReadTypeId()) {
@@ -59,7 +62,7 @@ public class AdditionalPropertyDeserializer extends AsArrayTypeDeserializer {
 		// whose fields happen to be named "type" or "properties").
 		JsonToken currentToken = p.currentToken();
 		if (currentToken == JsonToken.VALUE_STRING) {
-			return new PropertyVO().value(p.getText());
+			return new PropertyVO().value(p.getString());
 		} else if (currentToken == JsonToken.VALUE_NUMBER_INT) {
 			return new PropertyVO().value(p.getLongValue());
 		} else if (currentToken == JsonToken.VALUE_NUMBER_FLOAT) {
@@ -72,19 +75,19 @@ public class AdditionalPropertyDeserializer extends AsArrayTypeDeserializer {
 
 		// if no type id is present we need the next token to decide if its an object or an array
 		JsonToken t = p.nextToken();
-		// case FIELD_NAME:
-		// If the token is of type FIELD_NAME, no START_ARRAY was present, thus we can take the
+		// case PROPERTY_NAME:
+		// If the token is of type PROPERTY_NAME, no START_ARRAY was present, thus we can take the
 		// object and directly serialize it with the standard deserializer
-		if (t == JsonToken.FIELD_NAME) {
+		if (t == JsonToken.PROPERTY_NAME) {
 			// Buffer the full object so we can peek for the NGSI-LD "type" discriminator
 			// before committing to the typed deserializer. Without this, a plain JSON object
 			// (e.g. a Characteristic value whose fields are named "type" or "properties")
 			// causes an InvalidTypeIdException.
-			TokenBuffer buffer = new TokenBuffer(p, ctxt);
+			TokenBuffer buffer = TokenBuffer.forBuffering(p, ctxt);
 			buffer.writeStartObject();
 			while (p.currentToken() != JsonToken.END_OBJECT && p.currentToken() != null) {
 				String fieldName = p.currentName();
-				buffer.writeFieldName(fieldName);
+				buffer.writeName(fieldName);
 				p.nextToken();
 				buffer.copyCurrentStructure(p);
 				p.nextToken();
@@ -92,13 +95,13 @@ public class AdditionalPropertyDeserializer extends AsArrayTypeDeserializer {
 			buffer.writeEndObject();
 
 			// Peek: is the "type" field present with a valid NGSI-LD value?
-			if (hasNgsiLdType(buffer)) {
-				JsonParser bp = buffer.asParserOnFirstToken();
-				bp.nextToken(); // START_OBJECT -> FIELD_NAME
+			if (hasNgsiLdType(buffer, ctxt)) {
+				JsonParser bp = buffer.asParserOnFirstToken(ctxt);
+				bp.nextToken(); // START_OBJECT -> PROPERTY_NAME
 				return additionalPropertyObjectDeser.deserializeTypedFromObject(bp, ctxt);
 			} else {
 				// Plain object — not an NGSI-LD property. Wrap its value in a PropertyVO.
-				JsonParser bp = buffer.asParserOnFirstToken();
+				JsonParser bp = buffer.asParserOnFirstToken(ctxt);
 				Object plainValue = ctxt.readValue(bp, Object.class);
 				return new PropertyVO().value(plainValue);
 			}
@@ -120,15 +123,15 @@ public class AdditionalPropertyDeserializer extends AsArrayTypeDeserializer {
 	 * Peek inside a TokenBuffer to check whether the buffered object contains a "type"
 	 * field whose value is a valid NGSI-LD property type (Property, GeoProperty, Relationship).
 	 */
-	private boolean hasNgsiLdType(TokenBuffer buffer) throws IOException {
-		JsonParser peek = buffer.asParserOnFirstToken();
+	private boolean hasNgsiLdType(TokenBuffer buffer, DeserializationContext ctxt) {
+		JsonParser peek = buffer.asParserOnFirstToken(ctxt);
 		// START_OBJECT
-		while (peek.nextToken() == JsonToken.FIELD_NAME) {
+		while (peek.nextToken() == JsonToken.PROPERTY_NAME) {
 			String name = peek.currentName();
 			JsonToken valueToken = peek.nextToken();
 			if (AdditionalPropertyTypeResolver.NGSI_LD_TYPE_PROPERTY_NAME.equals(name)
 					&& valueToken == JsonToken.VALUE_STRING
-					&& NGSI_LD_TYPES.contains(peek.getText())) {
+					&& NGSI_LD_TYPES.contains(peek.getString())) {
 				return true;
 			}
 			// Skip the value (could be object/array)
@@ -143,14 +146,13 @@ public class AdditionalPropertyDeserializer extends AsArrayTypeDeserializer {
 	 * @param p the current parser
 	 * @param ctxt the desrialization context to use
 	 * @return object of the deserialized list, will be a PropertyList, GeoPropertyList or RelationshipList type
-	 * @throws IOException
 	 */
-	private Object deserializeArray(JsonParser p, DeserializationContext ctxt) throws IOException {
+	private Object deserializeArray(JsonParser p, DeserializationContext ctxt) {
 		List<Object> deserializedObjects = new ArrayList<>();
 		JsonToken next;
 		do {
 			next = p.nextToken();
-			if (next == JsonToken.FIELD_NAME) {
+			if (next == JsonToken.PROPERTY_NAME) {
 				deserializedObjects.add(additionalPropertyObjectDeser.deserializeTypedFromObject(p, ctxt));
 			}
 		} while (next != JsonToken.END_ARRAY);

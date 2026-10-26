@@ -1,7 +1,9 @@
 package io.github.wistefan.mapping;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.TokenStreamFactory;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import io.micronaut.context.ApplicationContext;
 import jakarta.inject.Singleton;
 import org.fiware.ngsi.model.EntityVO;
@@ -19,13 +21,17 @@ import org.junit.jupiter.params.provider.ValueSource;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
+import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Guards the DI wiring of the mapping beans and the Jackson customisations applied to the context ObjectMapper.
@@ -34,6 +40,14 @@ class MappingContextTest {
 
 	private static final String NGSI_URL_PROPERTY = "micronaut.http.services.ngsi.url";
 	private static final String DUMMY_NGSI_URL = "http://localhost:1026";
+	private static final String CANONICALIZE_FEATURE_PROPERTY = "jackson.json-factory-features.canonicalize-property-names";
+
+	private static final String SORT_FEATURE_PROPERTY = "jackson.mapper-features.sort-properties-alphabetically";
+	private static final String NULL_PRIMITIVES_FEATURE_PROPERTY = "jackson.deserialization-features.fail-on-null-for-primitives";
+	private static final String DATE_TIMESTAMPS_FEATURE_PROPERTY = "jackson.date-time-features.write-dates-as-timestamps";
+	private static final String DECLARATION_ORDER_JSON = "{\"second\":\"b\",\"first\":\"a\"}";
+	private static final String NULL_PRIMITIVE_JSON = "{\"count\":null}";
+	private static final String JSON_STRING_START = "\"";
 
 	private static final String ESCAPED_KEY = "tmfEscaped-@context";
 	private static final String UNESCAPED_KEY = "@context";
@@ -71,7 +85,53 @@ class MappingContextTest {
 	@DisplayName("The context ObjectMapper uses the escape cleaning factory.")
 	@Test
 	void usesEscapeCleaningFactory() {
-		assertInstanceOf(EscapeCleaningJsonFactory.class, objectMapper.getFactory(), "The escape cleaning factory should be used.");
+		assertInstanceOf(EscapeCleaningJsonFactory.class, objectMapper.tokenStreamFactory(), "The escape cleaning factory should be used.");
+	}
+
+	@DisplayName("Configured json-factory-features are applied to the escape cleaning factory.")
+	@Test
+	void appliesJsonFactoryFeatures() {
+		try (ApplicationContext featureContext = ApplicationContext.run(
+				Map.of(NGSI_URL_PROPERTY, DUMMY_NGSI_URL, CANONICALIZE_FEATURE_PROPERTY, false))) {
+			TokenStreamFactory factory = featureContext.getBean(ObjectMapper.class).tokenStreamFactory();
+			assertInstanceOf(EscapeCleaningJsonFactory.class, factory, "The escape cleaning factory should be used.");
+			assertFalse(factory.isEnabled(TokenStreamFactory.Feature.CANONICALIZE_PROPERTY_NAMES), "The configured feature should be disabled.");
+		}
+	}
+
+	@DisplayName("Jackson 3 changed defaults apply to the context ObjectMapper unless configured back.")
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("jackson2DefaultCases")
+	void jackson2DefaultsRequireConfiguration(String property, Boolean jackson2Value, MapperBehaviour jackson2Behaviour) {
+		assertFalse(jackson2Behaviour.test(objectMapper), "Without configuration, the Jackson 3 default should apply for " + property);
+		Map<String, Object> configuration = new HashMap<>(Map.of(NGSI_URL_PROPERTY, DUMMY_NGSI_URL));
+		configuration.put(property, jackson2Value);
+		try (ApplicationContext configuredContext = ApplicationContext.run(configuration)) {
+			assertTrue(jackson2Behaviour.test(configuredContext.getBean(ObjectMapper.class)), "The configured Jackson 2 default should apply for " + property);
+		}
+	}
+
+	@DisplayName("The CacheSerdeableObjectMapper keeps the Jackson 2 defaults.")
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("jackson2DefaultCases")
+	void cacheMapperKeepsJackson2Defaults(String property, Boolean jackson2Value, MapperBehaviour jackson2Behaviour) {
+		assertTrue(jackson2Behaviour.test(applicationContext.getBean(CacheSerdeableObjectMapper.class)), "The Jackson 2 default should apply for " + property);
+	}
+
+	private static Stream<Arguments> jackson2DefaultCases() {
+		return Stream.of(
+				Arguments.of(SORT_FEATURE_PROPERTY, false,
+						(MapperBehaviour) mapper -> mapper.writeValueAsString(new DeclarationOrderPojo()).equals(DECLARATION_ORDER_JSON)),
+				Arguments.of(NULL_PRIMITIVES_FEATURE_PROPERTY, false,
+						(MapperBehaviour) mapper -> {
+							try {
+								return mapper.readValue(NULL_PRIMITIVE_JSON, PrimitivePojo.class).count == 0;
+							} catch (JacksonException e) {
+								return false;
+							}
+						}),
+				Arguments.of(DATE_TIMESTAMPS_FEATURE_PROPERTY, true,
+						(MapperBehaviour) mapper -> !mapper.writeValueAsString(Instant.EPOCH).startsWith(JSON_STRING_START)));
 	}
 
 	@DisplayName("Escaped reserved keys are unescaped during parsing.")
@@ -101,6 +161,26 @@ class MappingContextTest {
 		EntityVO entityVO = objectMapper.readValue(ENTITY_WITH_PROPERTY_LIST, EntityVO.class);
 		assertInstanceOf(PropertyVO.class, entityVO.getAdditionalProperties().get("description"), "A single property should be deserialized.");
 		assertInstanceOf(PropertyListVO.class, entityVO.getAdditionalProperties().get("listProp"), "A property list should be deserialized.");
+	}
+
+	@FunctionalInterface
+	private interface MapperBehaviour {
+		boolean test(ObjectMapper mapper);
+	}
+
+	/**
+	 * Properties declared in non-alphabetical order.
+	 */
+	public static class DeclarationOrderPojo {
+		public String second = "b";
+		public String first = "a";
+	}
+
+	/**
+	 * Target for mapping a null value onto a primitive.
+	 */
+	public static class PrimitivePojo {
+		public int count;
 	}
 
 	@FunctionalInterface
