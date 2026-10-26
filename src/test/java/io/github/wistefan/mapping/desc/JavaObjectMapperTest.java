@@ -274,7 +274,7 @@ class JavaObjectMapperTest {
 		myPojoWithListOfSubEntity.setMySubProperty(new ArrayList<>());
 
 		JsonNode entity = OBJECT_MAPPER.readTree(OBJECT_MAPPER.writeValueAsString(
-				javaObjectMapper.toEntityVO(myPojoWithListOfSubEntity, MappingContext.CREATE)));
+				javaObjectMapper.toEntityVO(myPojoWithListOfSubEntity, NgsiLdWriteOperation.CREATE)));
 
 		assertFalse(entity.has("sub-entity"), "An empty list attribute must not be sent on create.");
 	}
@@ -287,7 +287,7 @@ class JavaObjectMapperTest {
 		myPojoWithListOfSubEntity.setMySubProperty(new ArrayList<>());
 
 		JsonNode entity = OBJECT_MAPPER.readTree(OBJECT_MAPPER.writeValueAsString(
-				javaObjectMapper.toEntityVO(myPojoWithListOfSubEntity, MappingContext.UPDATE)));
+				javaObjectMapper.toEntityVO(myPojoWithListOfSubEntity, NgsiLdWriteOperation.UPDATE)));
 
 		JsonNode attribute = entity.get("sub-entity");
 		assertNotNull(attribute, "The empty list attribute has to be sent on update.");
@@ -304,11 +304,11 @@ class JavaObjectMapperTest {
 		pojo.setMySubProperties(new ArrayList<>());
 
 		JsonNode created = OBJECT_MAPPER.readTree(OBJECT_MAPPER.writeValueAsString(
-				javaObjectMapper.toEntityVO(pojo, MappingContext.CREATE)));
+				javaObjectMapper.toEntityVO(pojo, NgsiLdWriteOperation.CREATE)));
 		assertFalse(created.has("mySubProperty"), "An empty list attribute must not be sent on create.");
 
 		JsonNode updated = OBJECT_MAPPER.readTree(OBJECT_MAPPER.writeValueAsString(
-				javaObjectMapper.toEntityVO(pojo, MappingContext.UPDATE)));
+				javaObjectMapper.toEntityVO(pojo, NgsiLdWriteOperation.UPDATE)));
 		JsonNode attribute = updated.get("mySubProperty");
 		assertNotNull(attribute, "The empty list attribute has to be sent on update.");
 		JsonNode instance = attribute.isArray() ? attribute.get(0) : attribute;
@@ -325,7 +325,7 @@ class JavaObjectMapperTest {
 		myPojoWithListOfSubEntity.setMySubProperty(new ArrayList<>());
 
 		assertEquals(
-				OBJECT_MAPPER.writeValueAsString(javaObjectMapper.toEntityVO(myPojoWithListOfSubEntity, MappingContext.CREATE)),
+				OBJECT_MAPPER.writeValueAsString(javaObjectMapper.toEntityVO(myPojoWithListOfSubEntity, NgsiLdWriteOperation.CREATE)),
 				OBJECT_MAPPER.writeValueAsString(javaObjectMapper.toEntityVO(myPojoWithListOfSubEntity)),
 				"Existing callers of toEntityVO(entity) should get the create behaviour.");
 	}

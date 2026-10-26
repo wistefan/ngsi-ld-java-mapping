@@ -203,20 +203,20 @@ public class JavaObjectMapper extends Mapper {
 	 * @return the NGSI-LD entity object
 	 */
 	public <T> EntityVO toEntityVO(T entity) {
-		return toEntityVO(entity, MappingContext.CREATE);
+		return toEntityVO(entity, NgsiLdWriteOperation.CREATE);
 	}
 
 	/**
 	 * Translate the given java object into an NGSI-LD entity.
 	 *
 	 * @param entity         the object to be translated
-	 * @param mappingContext whether the result is meant for creating or updating the entity at
+	 * @param writeOperation whether the result is meant for creating or updating the entity at
 	 *                       the broker - controls how a list-type attribute (Property or
 	 *                       Relationship) with no instances is represented, see
-	 *                       {@link MappingContext}
+	 *                       {@link NgsiLdWriteOperation}
 	 * @return the NGSI-LD entity object
 	 */
-	public <T> EntityVO toEntityVO(T entity, MappingContext mappingContext) {
+	public <T> EntityVO toEntityVO(T entity, NgsiLdWriteOperation writeOperation) {
 		isMappingEnabled(entity.getClass())
 				.orElseThrow(() -> new UnsupportedOperationException(
 						String.format("Generic mapping to NGSI-LD entities is not supported for object %s",
@@ -270,11 +270,11 @@ public class JavaObjectMapper extends Mapper {
 		if (unmappedPropertiesGetterMethods.isEmpty()) {
 			return buildEntity(entity, entityIdMethod.get(0), entityTypeMethod.get(0), Optional.empty(), propertyMethods,
 					propertyListMethods,
-					geoPropertyMethods, relationshipMethods, relationshipListMethods, mappingContext);
+					geoPropertyMethods, relationshipMethods, relationshipListMethods, writeOperation);
 		} else {
 			return buildEntity(entity, entityIdMethod.get(0), entityTypeMethod.get(0), Optional.of(unmappedPropertiesGetterMethods.get(0)), propertyMethods,
 					propertyListMethods,
-					geoPropertyMethods, relationshipMethods, relationshipListMethods, mappingContext);
+					geoPropertyMethods, relationshipMethods, relationshipListMethods, writeOperation);
 		}
 	}
 
@@ -285,7 +285,7 @@ public class JavaObjectMapper extends Mapper {
 									 List<Method> propertyMethods, List<Method> propertyListMethods,
 									 List<Method> geoPropertyMethods,
 									 List<Method> relationshipMethods, List<Method> relationshipListMethods,
-									 MappingContext mappingContext) {
+									 NgsiLdWriteOperation writeOperation) {
 
 		EntityVO entityVO = new EntityVO();
 		entityVO.setAtContext(mappingProperties.getContextUrl());
@@ -346,7 +346,7 @@ public class JavaObjectMapper extends Mapper {
 			if (!(entry.getValue() instanceof List<?> multiAttribute) || !multiAttribute.isEmpty()) {
 				continue;
 			}
-			if (mappingContext == MappingContext.CREATE) {
+			if (writeOperation == NgsiLdWriteOperation.CREATE) {
 				additionalPropertiesIterator.remove();
 			} else if (entry.getValue() instanceof PropertyListVO propertyListVO) {
 				propertyListVO.add(new PropertyVO().value(NGSI_LD_NULL));
