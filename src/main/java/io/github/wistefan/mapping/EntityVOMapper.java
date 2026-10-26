@@ -3,13 +3,12 @@ package io.github.wistefan.mapping;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.module.SimpleModule;
 import io.github.wistefan.mapping.annotations.*;
 import lombok.extern.slf4j.Slf4j;
 import org.fiware.ngsi.model.*;
 import reactor.core.publisher.Mono;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import javax.swing.undo.UndoManager;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -39,13 +38,6 @@ public class EntityVOMapper extends Mapper {
 		this.mappingProperties = mappingProperties;
 		this.objectMapper = objectMapper;
 		this.entitiesRepository = entitiesRepository;
-		this.objectMapper
-				.addMixIn(AdditionalPropertyVO.class, AdditionalPropertyMixin.class);
-
-		this.objectMapper.registerModule(new SimpleModule().addDeserializer(GeoQueryVO.class,
-				new GeoQueryDeserializer()));
-
-		this.objectMapper.findAndRegisterModules();
 	}
 
 	/**

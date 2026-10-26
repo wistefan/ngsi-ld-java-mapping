@@ -41,7 +41,7 @@
     <properties>
         <jdk.version>17</jdk.version>
         <release.version>17</release.version>
-        <micronaut.version>4.6.5</micronaut.version>
+        <micronaut.version>4.10.11</micronaut.version>
 
         <!-- project info -->
         <project.author.name>Stefan Wiedemann</project.author.name>
@@ -74,9 +74,9 @@
         <!-- annotations -->
         <version.javax.annotation-api>1.3.2</version.javax.annotation-api>
         <version.jakarta.annotation.jakarta.annotation-api>2.1.1</version.jakarta.annotation.jakarta.annotation-api>
-        <version.io.micronaut.micronaut-core>4.6.5</version.io.micronaut.micronaut-core>
+        <version.io.micronaut.micronaut-core>4.10.11</version.io.micronaut.micronaut-core>
         <version.io.micronaut.micronaut-http-client>4.10.11</version.io.micronaut.micronaut-http-client>
-        <version.io.micronaut.micronaut-jackson-databind>4.6.5</version.io.micronaut.micronaut-jackson-databind>
+        <version.io.micronaut.micronaut-jackson-databind>4.10.11</version.io.micronaut.micronaut-jackson-databind>
 
         <!-- json -->
         <version.com.fasterxml.jackson.core.jackson-databind>2.18.10</version.com.fasterxml.jackson.core.jackson-databind>
@@ -85,7 +85,6 @@
         <!-- rx -->
         <version.io.reactivex.rxjava2.rxjava>2.2.21</version.io.reactivex.rxjava2.rxjava>
         <version.io.projectreactor.reactor-core>3.6.10</version.io.projectreactor.reactor-core>
-        <version.javax.inject>1</version.javax.inject>
 
         <!-- logging -->
         <version.org.slf4j.slf4j-api>2.0.7</version.org.slf4j.slf4j-api>
@@ -143,12 +142,6 @@
             <artifactId>rxjava</artifactId>
             <version>${version.io.reactivex.rxjava2.rxjava}</version>
             <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>javax.inject</groupId>
-            <artifactId>javax.inject</artifactId>
-            <version>${version.javax.inject}</version>
-            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>javax.annotation</groupId>
