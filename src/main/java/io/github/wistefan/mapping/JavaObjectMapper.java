@@ -1,7 +1,7 @@
 package io.github.wistefan.mapping;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import io.github.wistefan.mapping.annotations.AttributeGetter;
 import io.github.wistefan.mapping.annotations.AttributeSetter;
 import io.github.wistefan.mapping.annotations.AttributeType;
@@ -20,7 +20,7 @@ import org.fiware.ngsi.model.PropertyVO;
 import org.fiware.ngsi.model.RelationshipListVO;
 import org.fiware.ngsi.model.RelationshipVO;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;

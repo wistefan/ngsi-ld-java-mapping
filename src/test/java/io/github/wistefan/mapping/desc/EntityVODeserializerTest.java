@@ -1,7 +1,8 @@
 package io.github.wistefan.mapping.desc;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import io.github.wistefan.mapping.AdditionalPropertyMixin;
 import org.fiware.ngsi.model.AdditionalPropertyVO;
 import org.fiware.ngsi.model.EntityVO;
@@ -15,9 +16,10 @@ public class EntityVODeserializerTest {
 
 
     @Test
-    public void testDeserialization() throws JsonProcessingException {
-        ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.addMixIn(AdditionalPropertyVO.class, AdditionalPropertyMixin.class);
+    public void testDeserialization() throws JacksonException {
+        ObjectMapper objectMapper = JsonMapper.builder()
+                .addMixIn(AdditionalPropertyVO.class, AdditionalPropertyMixin.class)
+                .build();
 
         String testEntity = "{\n" +
                 "  \"id\" : \"urn:ngsi-ld:product-offering:716fa880-b910-458a-bc96-14a6ba98cb48\",\n" +

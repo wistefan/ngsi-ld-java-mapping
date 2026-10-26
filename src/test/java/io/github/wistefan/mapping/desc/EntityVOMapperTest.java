@@ -1,12 +1,8 @@
 package io.github.wistefan.mapping.desc;
 
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.deser.BeanDeserializerBuilder;
-import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
-import com.fasterxml.jackson.databind.deser.SettableBeanProperty;
-import com.fasterxml.jackson.databind.module.SimpleModule;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import io.github.wistefan.mapping.*;
 import io.github.wistefan.mapping.desc.pojos.*;
 import io.github.wistefan.mapping.desc.pojos.invalid.MyPojoWithSubEntityWellKnown;
@@ -36,7 +32,9 @@ import static org.mockito.Mockito.when;
 
 class EntityVOMapperTest {
 
-	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new EscapeCleaningJsonFactory());
+	private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder(new EscapeCleaningJsonFactory())
+			.addModule(new NgsiLdMappingModule())
+			.build();
 
 	private EntityVOMapper entityVOMapper;
 	private EntitiesRepository entitiesRepository = mock(EntitiesRepository.class);
@@ -48,13 +46,22 @@ class EntityVOMapperTest {
 
 		mappingProperties = new MappingProperties();
 		entityVOMapper = new EntityVOMapper(mappingProperties, OBJECT_MAPPER, entitiesRepository);
-		OBJECT_MAPPER
-				.addMixIn(AdditionalPropertyVO.class, AdditionalPropertyMixin.class);
+	}
+
+	@DisplayName("Creating the mapper with an ObjectMapper missing the NgsiLdMappingModule fails fast.")
+	@Test
+	void testMissingMappingModule() {
+		ObjectMapper plainObjectMapper = JsonMapper.builder().build();
+
+		IllegalStateException illegalStateException = assertThrows(IllegalStateException.class,
+				() -> new EntityVOMapper(mappingProperties, plainObjectMapper, entitiesRepository));
+		assertTrue(illegalStateException.getMessage().contains(NgsiLdMappingModule.MODULE_NAME),
+				"The exception should name the missing module.");
 	}
 
 	@DisplayName("Map entity containing a relationship.")
 	@Test
-	void testSubEntityMapping() throws JsonProcessingException {
+	void testSubEntityMapping() throws JacksonException {
 		MySubPropertyEntity expectedSubEntity = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:the-sub-entity");
 		MyPojoWithSubEntity expectedPojo = new MyPojoWithSubEntity("urn:ngsi-ld:complex-pojo:the-test-pojo");
 		expectedPojo.setMySubProperty(expectedSubEntity);
@@ -513,7 +520,7 @@ class EntityVOMapperTest {
 
 	@DisplayName("Map Pojo with a field that is an object.")
 	@Test
-	void testSubPropertyMapping() throws JsonProcessingException {
+	void testSubPropertyMapping() throws JacksonException {
 		MyPojoWithSubProperty expectedPojo = new MyPojoWithSubProperty("urn:ngsi-ld:complex-pojo:the-test-pojo");
 		MySubProperty mySubProperty = new MySubProperty();
 		mySubProperty.setPropertyName("My property");
@@ -528,7 +535,7 @@ class EntityVOMapperTest {
 
 	@DisplayName("Map Pojo with a field that is a list of objects.")
 	@Test
-	void testListOfSubPropertyMapping() throws JsonProcessingException {
+	void testListOfSubPropertyMapping() throws JacksonException {
 		MyPojoWithListOfSubProperty expectedPojo = new MyPojoWithListOfSubProperty(
 				"urn:ngsi-ld:complex-pojo:the-test-pojo");
 		MySubProperty mySubProperty1 = new MySubProperty();
@@ -547,7 +554,7 @@ class EntityVOMapperTest {
 
 	@DisplayName("Map entity containing a relationship that could not be resolved with strict-mapping disabled.")
 	@Test
-	void testSubEntityMappingNoStrict() throws JsonProcessingException {
+	void testSubEntityMappingNoStrict() throws JacksonException {
 		mappingProperties.setStrictRelationships(false);
 		MySubPropertyEntity expectedSubEntity = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:the-sub-entity");
 		MyPojoWithSubEntity expectedPojo = new MyPojoWithSubEntity("urn:ngsi-ld:complex-pojo:the-test-pojo");
@@ -564,7 +571,7 @@ class EntityVOMapperTest {
 
 	@DisplayName("Fail entity containing a relationship that could not be resolved with strict-mapping enabled.")
 	@Test
-	void testSubEntityMappingStrict() throws JsonProcessingException {
+	void testSubEntityMappingStrict() throws JacksonException {
 		mappingProperties.setStrictRelationships(true);
 		when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of()));
 
@@ -577,7 +584,7 @@ class EntityVOMapperTest {
 
 	@DisplayName("Map entity containing a relationship with embedded values.")
 	@Test
-	void testSubEntityEmbedMapping() throws JsonProcessingException {
+	void testSubEntityEmbedMapping() throws JacksonException {
 		MySubPropertyEntityEmbed expectedSubEntity = new MySubPropertyEntityEmbed("urn:ngsi-ld:sub-entity:the-sub-entity");
 		MyPojoWithSubEntityEmbed expectedPojo = new MyPojoWithSubEntityEmbed("urn:ngsi-ld:complex-pojo:the-test-pojo");
 		expectedPojo.setMySubProperty(expectedSubEntity);
@@ -596,7 +603,7 @@ class EntityVOMapperTest {
 
 	@DisplayName("Map entity with an embedded property named after a newly added reserved word (unitCode).")
 	@Test
-	void testSubEntityEmbedMappingWithReservedWordProperty() throws JsonProcessingException {
+	void testSubEntityEmbedMappingWithReservedWordProperty() throws JacksonException {
 		MySubPropertyEntityEmbed expectedSubEntity = new MySubPropertyEntityEmbed("urn:ngsi-ld:sub-entity:the-sub-entity");
 		expectedSubEntity.setUnitCode("C62");
 		MyPojoWithSubEntityEmbed expectedPojo = new MyPojoWithSubEntityEmbed("urn:ngsi-ld:complex-pojo:the-test-pojo");
@@ -620,7 +627,7 @@ class EntityVOMapperTest {
 
 	@DisplayName("Map entity with all supported attribute types.")
 	@Test
-	void testListEntityMapping() throws JsonProcessingException {
+	void testListEntityMapping() throws JacksonException {
 		PropertyListPojo propertyListPojo = new PropertyListPojo("urn:ngsi-ld:list-pojo:the-pojo");
 
 		MySubPropertyEntity subEntity1 = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:the-sub-entity-1");
@@ -926,7 +933,7 @@ class EntityVOMapperTest {
 	}
 
 	@Test
-	void testReadingNotificationFromJson() throws JsonProcessingException {
+	void testReadingNotificationFromJson() throws JacksonException {
 		String json = """
 				{
 				  "id": "urn:ngsi-ld:Notification:4233e3ca-50c3-11ee-8433-0a580a826912",
@@ -986,7 +993,7 @@ class EntityVOMapperTest {
 
 	@DisplayName("*****Test mapping geo entities*****")
 	@Test
-	void testMappingGeoEntities() throws JsonProcessingException {
+	void testMappingGeoEntities() throws JacksonException {
 		MyPojoWithLocation expectedPojoWithLocation = new MyPojoWithLocation("urn:ngsi-ld:complex-pojo:the-test-pojo");
 		MyLocation location = new MyLocation();
 		double[] coordinates = new double[]{0.0, 0.0};

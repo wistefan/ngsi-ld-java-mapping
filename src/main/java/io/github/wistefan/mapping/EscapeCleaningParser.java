@@ -1,10 +1,11 @@
 package io.github.wistefan.mapping;
 
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.util.JsonParserDelegate;
-
-import java.io.IOException;
+import tools.jackson.core.JsonParser;
+import tools.jackson.core.JsonToken;
+import tools.jackson.core.SerializableString;
+import tools.jackson.core.sym.PropertyNameMatcher;
+import tools.jackson.core.util.JsonParserDelegate;
 
 /**
  * Implementation of the JsonParser, that cleans json-key's that are escaped to comply with NGSI-LD.
@@ -24,13 +25,53 @@ public class EscapeCleaningParser extends JsonParserDelegate {
 	}
 
 	@Override
-	public String getCurrentName() throws IOException {
+	public String currentName() {
 		return cleanName(super.currentName());
 	}
 
+	// Jackson 3's delegate forwards the name-advancing and name-matching methods straight to the
+	// wrapped parser; bean deserializers use them, so they have to go through cleanName as well.
 	@Override
-	public String currentName() throws IOException {
-		return cleanName(super.currentName());
+	public String nextName() {
+		return nextToken() == JsonToken.PROPERTY_NAME ? currentName() : null;
+	}
+
+	@Override
+	public boolean nextName(SerializableString str) {
+		return nextToken() == JsonToken.PROPERTY_NAME && str.getValue().equals(currentName());
+	}
+
+	@Override
+	public int nextNameMatch(PropertyNameMatcher matcher) {
+		nextToken();
+		return currentNameMatch(matcher);
+	}
+
+	@Override
+	public int currentNameMatch(PropertyNameMatcher matcher) {
+		JsonToken token = currentToken();
+		if (token == JsonToken.PROPERTY_NAME) {
+			return matcher.matchName(currentName());
+		}
+		if (token == JsonToken.END_OBJECT) {
+			return PropertyNameMatcher.MATCH_END_OBJECT;
+		}
+		return PropertyNameMatcher.MATCH_ODD_TOKEN;
+	}
+
+	@Override
+	public String getString() {
+		return currentToken() == JsonToken.PROPERTY_NAME ? currentName() : super.getString();
+	}
+
+	@Override
+	public String getValueAsString() {
+		return currentToken() == JsonToken.PROPERTY_NAME ? currentName() : super.getValueAsString();
+	}
+
+	@Override
+	public String getValueAsString(String defaultValue) {
+		return currentToken() == JsonToken.PROPERTY_NAME ? currentName() : super.getValueAsString(defaultValue);
 	}
 
 	private static String cleanName(String name) {

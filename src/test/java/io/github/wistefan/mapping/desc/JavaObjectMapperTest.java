@@ -1,10 +1,12 @@
 package io.github.wistefan.mapping.desc;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.MapperFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 import io.github.wistefan.mapping.*;
 import io.github.wistefan.mapping.desc.pojos.*;
 import io.github.wistefan.mapping.desc.pojos.invalid.*;
@@ -28,25 +30,25 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.*;
 
 class JavaObjectMapperTest {
-	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+	private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder()
+			.changeDefaultPropertyInclusion(incl -> incl.withValueInclusion(JsonInclude.Include.NON_NULL))
+			// for comparison, we need a reliable order of the outcome
+			.enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
+			// keep the Jackson 2 declaration order of bean properties
+			.disable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
+			.addMixIn(AdditionalPropertyVO.class, AdditionalPropertyMixin.class)
+			.build();
 
 	private JavaObjectMapper javaObjectMapper;
 
 	@BeforeEach
 	public void setup() {
-		javaObjectMapper = new JavaObjectMapper(new MappingProperties(), new ObjectMapper());
-		OBJECT_MAPPER.setSerializationInclusion(JsonInclude.Include.NON_NULL);
-		// for comparison, we need a reliable order of the outcome
-		OBJECT_MAPPER.configure(
-				SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true
-		);
-		OBJECT_MAPPER
-				.addMixIn(AdditionalPropertyVO.class, AdditionalPropertyMixin.class);
+		javaObjectMapper = new JavaObjectMapper(new MappingProperties(), new JsonMapper());
 	}
 
 	@DisplayName("Simple pojo mapping.")
 	@Test
-	void testSimplePojoMapping() throws JsonProcessingException {
+	void testSimplePojoMapping() throws JacksonException {
 		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:my-pojo:the-test-pojo\",\"type\":\"my-pojo\",\"name\":{\"type\":\"Property\",\"value\":\"The test pojo.\"},\"numbers\":{\"type\":\"Property\",\"value\":[1,2,3]}}";
 
 		MyPojo myPojo = new MyPojo("urn:ngsi-ld:my-pojo:the-test-pojo");
@@ -64,7 +66,7 @@ class JavaObjectMapperTest {
 
 	@DisplayName("Map Pojo with a field that is an object.")
 	@Test
-	void testSubPropertyMapping() throws JsonProcessingException {
+	void testSubPropertyMapping() throws JacksonException {
 		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"mySubProperty\":{\"value\":{\"propertyName\":\"My property\"},\"type\":\"Property\",\"propertyName\":{\"value\":\"My property\",\"type\":\"Property\"}}}";
 		MyPojoWithSubProperty myComplexPojo = new MyPojoWithSubProperty("urn:ngsi-ld:complex-pojo:the-test-pojo");
 		MySubProperty mySubProperty = new MySubProperty();
@@ -77,7 +79,7 @@ class JavaObjectMapperTest {
 
 	@DisplayName("Map Pojo with a field that is a list of objects.")
 	@Test
-	void testListOfSubPropertyMapping() throws JsonProcessingException {
+	void testListOfSubPropertyMapping() throws JacksonException {
 		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"mySubProperty\":[{\"value\":{\"propertyName\":\"My property 1\"},\"type\":\"Property\",\"propertyName\":{\"value\":\"My property 1\",\"type\":\"Property\"}},{\"value\":{\"propertyName\":\"My property 2\"},\"type\":\"Property\",\"propertyName\":{\"value\":\"My property 2\",\"type\":\"Property\"}}]}";
 		MyPojoWithListOfSubProperty myComplexPojo = new MyPojoWithListOfSubProperty(
 				"urn:ngsi-ld:complex-pojo:the-test-pojo");
@@ -104,7 +106,7 @@ class JavaObjectMapperTest {
 
 	@DisplayName("Map Pojo with a field that is a relationship.")
 	@Test
-	void testSubEntityMapping() throws JsonProcessingException {
+	void testSubEntityMapping() throws JacksonException {
 		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity\":{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\"}}";
 
 		MySubPropertyEntity mySubProperty = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:the-sub-entity");
@@ -116,7 +118,7 @@ class JavaObjectMapperTest {
 
 	@DisplayName("Map Pojo with a field that is a relationship with additional attributes.")
 	@Test
-	void testSubEntityEmbedMapping() throws JsonProcessingException {
+	void testSubEntityEmbedMapping() throws JacksonException {
 		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity\":{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"role\":{\"value\":\"Sub-Entity\",\"type\":\"Property\"}}}";
 
 		MySubPropertyEntityEmbed mySubProperty = new MySubPropertyEntityEmbed("urn:ngsi-ld:sub-entity:the-sub-entity");
@@ -128,7 +130,7 @@ class JavaObjectMapperTest {
 
 	@DisplayName("An embedded property named after a newly added reserved word should be escaped on the wire.")
 	@Test
-	void testSubEntityEmbedMappingWithReservedWordProperty() throws JsonProcessingException {
+	void testSubEntityEmbedMappingWithReservedWordProperty() throws JacksonException {
 		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:complex-pojo:the-test-pojo\",\"type\":\"complex-pojo\",\"sub-entity\":{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\",\"role\":{\"value\":\"Sub-Entity\",\"type\":\"Property\"},\"tmfEscaped-unitCode\":{\"value\":\"C62\",\"type\":\"Property\"}}}";
 
 		MySubPropertyEntityEmbed mySubProperty = new MySubPropertyEntityEmbed("urn:ngsi-ld:sub-entity:the-sub-entity");
@@ -141,7 +143,7 @@ class JavaObjectMapperTest {
 
 	@DisplayName("Map Pojo with a field that is a relationship-list.")
 	@Test
-	void testEntityWithRelationShipList() throws JsonProcessingException {
+	void testEntityWithRelationShipList() throws JacksonException {
 		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:sub-entity-pojo:the-parent\",\"type\":\"complex-pojo\",\"sub-entity\":[{\"object\":\"urn:ngsi-ld:sub-entity:the-sub-entity\",\"type\":\"Relationship\"}]}";
 		MySubPropertyEntity mySubEntity = new MySubPropertyEntity("urn:ngsi-ld:sub-entity:the-sub-entity");
 		MyPojoWithListOfSubEntity myPojoWithListOfSubEntity = new MyPojoWithListOfSubEntity(
@@ -154,7 +156,7 @@ class JavaObjectMapperTest {
 
 	@DisplayName("Pojo without an entity-id method should not be mapped.")
 	@Test
-	void testFailWithoutId() throws JsonProcessingException {
+	void testFailWithoutId() throws JacksonException {
 		MyPojoWithoutId myPojoWithoutId = new MyPojoWithoutId();
 		assertThrows(MappingException.class, () -> javaObjectMapper.toEntityVO(myPojoWithoutId),
 				"A pojo without an entity id method should not be mapped.");
@@ -162,7 +164,7 @@ class JavaObjectMapperTest {
 
 	@DisplayName("Pojo with a non-uri entity-id method should not be mapped.")
 	@Test
-	void testFailWithWrongIdType() throws JsonProcessingException {
+	void testFailWithWrongIdType() throws JacksonException {
 		MyPojoWithWrongIdType myPojoWithWrongIdType = new MyPojoWithWrongIdType(3);
 		assertThrows(MappingException.class, () -> javaObjectMapper.toEntityVO(myPojoWithWrongIdType),
 				"A pojo without a non uri id should not be mapped.");
@@ -170,7 +172,7 @@ class JavaObjectMapperTest {
 
 	@DisplayName("Pojo without an entity-type method should not be mapped.")
 	@Test
-	void testFailWithoutType() throws JsonProcessingException {
+	void testFailWithoutType() throws JacksonException {
 		MyPojoWithoutType myPojoWithoutType = new MyPojoWithoutType(URI.create("urn:ngsi-ld:entity:the-entity"));
 		assertThrows(MappingException.class, () -> javaObjectMapper.toEntityVO(myPojoWithoutType),
 				"A pojo without an entity type method should not be mapped.");
@@ -178,7 +180,7 @@ class JavaObjectMapperTest {
 
 	@DisplayName("Pojo with a non-string entity-type method should not be mapped.")
 	@Test
-	void testFailWithWrongTypeType() throws JsonProcessingException {
+	void testFailWithWrongTypeType() throws JacksonException {
 		MyPojoWithWrongTypeType myPojoWithWrongTypeType = new MyPojoWithWrongTypeType(
 				URI.create("urn:ngsi-ld:entity:the-entity"));
 		assertThrows(MappingException.class, () -> javaObjectMapper.toEntityVO(myPojoWithWrongTypeType),
@@ -187,7 +189,7 @@ class JavaObjectMapperTest {
 
 	@DisplayName("Pojo with more than one entity-type methods should not be mapped.")
 	@Test
-	void testFailWithMulitpleTypes() throws JsonProcessingException {
+	void testFailWithMulitpleTypes() throws JacksonException {
 		MyPojoWithMultipleTypes myPojoWithMultipleTypes = new MyPojoWithMultipleTypes(
 				URI.create("urn:ngsi-ld:entity:the-entity"));
 		assertThrows(MappingException.class, () -> javaObjectMapper.toEntityVO(myPojoWithMultipleTypes),
@@ -196,7 +198,7 @@ class JavaObjectMapperTest {
 
 	@DisplayName("Pojo with more than one entity-id methods should not be mapped.")
 	@Test
-	void testFailWithMulitpleIds() throws JsonProcessingException {
+	void testFailWithMulitpleIds() throws JacksonException {
 		MyPojoWithMultipleIds myPojoWithMultipleIds = new MyPojoWithMultipleIds();
 		assertThrows(MappingException.class, () -> javaObjectMapper.toEntityVO(myPojoWithMultipleIds),
 				"A pojo without more than one id should not be mapped.");
@@ -204,7 +206,7 @@ class JavaObjectMapperTest {
 
 	@DisplayName("Pojo with a private entity-type method should not be mapped.")
 	@Test
-	void testFailWithPrivateType() throws JsonProcessingException {
+	void testFailWithPrivateType() throws JacksonException {
 		MyPojoWithPrivateType myPojoWithPrivateType = new MyPojoWithPrivateType();
 		assertThrows(MappingException.class, () -> javaObjectMapper.toEntityVO(myPojoWithPrivateType),
 				"A pojo with a private type should not be mapped.");
@@ -212,7 +214,7 @@ class JavaObjectMapperTest {
 
 	@DisplayName("Pojo with a private entity-id methods should not be mapped.")
 	@Test
-	void testFailWithPrivateId() throws JsonProcessingException {
+	void testFailWithPrivateId() throws JacksonException {
 		MyPojoWithPrivateId myPojoWithPrivateId = new MyPojoWithPrivateId();
 		assertThrows(MappingException.class, () -> javaObjectMapper.toEntityVO(myPojoWithPrivateId),
 				"A pojo with a private id should not be mapped.");
@@ -220,7 +222,7 @@ class JavaObjectMapperTest {
 
 	@DisplayName("Pojo with a sub-entity without relationship object should not be mapped.")
 	@Test
-	void testFailWithNoRelObject() throws JsonProcessingException {
+	void testFailWithNoRelObject() throws JacksonException {
 		MySubEntityWithoutRelationshipObject mySubEntityWithoutRelationshipObject = new MySubEntityWithoutRelationshipObject();
 		MyInvalidRelationshipPojo myInvalidRelationshipPojo = new MyInvalidRelationshipPojo(
 				"urn:ngsi-ld:entity:the-entity");
@@ -231,7 +233,7 @@ class JavaObjectMapperTest {
 
 	@DisplayName("Pojo with non-list relationship-list should not be mapped.")
 	@Test
-	void testFailWithNonListRelList() throws JsonProcessingException {
+	void testFailWithNonListRelList() throws JacksonException {
 		MySubPropertyEntity mySubPropertyEntity = new MySubPropertyEntity("urn:ngsi-ld:entity:the-entity");
 		MyInvalidListRelationshipPojo myInvalidListRelationshipPojo = new MyInvalidListRelationshipPojo(
 				"urn:ngsi-ld:entity:the-entity");
@@ -242,7 +244,7 @@ class JavaObjectMapperTest {
 
 	@DisplayName("Pojo with null relationship-list should be mapped.")
 	@Test
-	void testWithNullListRelList() throws JsonProcessingException {
+	void testWithNullListRelList() throws JacksonException {
 		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:entity:the-entity\",\"type\":\"complex-pojo\"}";
 		MyPojoWithListOfSubEntity myPojoWithListOfSubEntity = new MyPojoWithListOfSubEntity(
 				"urn:ngsi-ld:entity:the-entity");
@@ -254,7 +256,7 @@ class JavaObjectMapperTest {
 
 	@DisplayName("Pojo with null entry in relationship-list should be mapped, omitting the empty list on create.")
 	@Test
-	void testWithNullInRelList() throws JsonProcessingException {
+	void testWithNullInRelList() throws JacksonException {
 		String expectedJson = "{\"@context\":\"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld\",\"id\":\"urn:ngsi-ld:entity:the-entity\",\"type\":\"complex-pojo\"}";
 		MyPojoWithListOfSubEntity myPojoWithListOfSubEntity = new MyPojoWithListOfSubEntity(
 				"urn:ngsi-ld:entity:the-entity");
@@ -268,7 +270,7 @@ class JavaObjectMapperTest {
 
 	@DisplayName("An empty relationship-list is omitted on create.")
 	@Test
-	void testEmptyRelListIsOmittedOnCreate() throws JsonProcessingException {
+	void testEmptyRelListIsOmittedOnCreate() throws JacksonException {
 		MyPojoWithListOfSubEntity myPojoWithListOfSubEntity = new MyPojoWithListOfSubEntity(
 				"urn:ngsi-ld:entity:the-entity");
 		myPojoWithListOfSubEntity.setMySubProperty(new ArrayList<>());
@@ -281,7 +283,7 @@ class JavaObjectMapperTest {
 
 	@DisplayName("An empty relationship-list is sent as NGSI-LD Null on update, so the broker deletes it.")
 	@Test
-	void testEmptyRelListIsNullOnUpdate() throws JsonProcessingException {
+	void testEmptyRelListIsNullOnUpdate() throws JacksonException {
 		MyPojoWithListOfSubEntity myPojoWithListOfSubEntity = new MyPojoWithListOfSubEntity(
 				"urn:ngsi-ld:entity:the-entity");
 		myPojoWithListOfSubEntity.setMySubProperty(new ArrayList<>());
@@ -293,13 +295,13 @@ class JavaObjectMapperTest {
 		assertNotNull(attribute, "The empty list attribute has to be sent on update.");
 		JsonNode instance = attribute.isArray() ? attribute.get(0) : attribute;
 		assertEquals(1, attribute.isArray() ? attribute.size() : 1, "Exactly one Null instance should be sent.");
-		assertEquals("Relationship", instance.get("type").asText());
-		assertEquals("urn:ngsi-ld:null", instance.get("object").asText(), "The instance should carry the NGSI-LD Null.");
+		assertEquals("Relationship", instance.get("type").asString());
+		assertEquals("urn:ngsi-ld:null", instance.get("object").asString(), "The instance should carry the NGSI-LD Null.");
 	}
 
 	@DisplayName("An empty property-list is omitted on create and sent as NGSI-LD Null on update.")
 	@Test
-	void testEmptyPropertyListOnCreateAndUpdate() throws JsonProcessingException {
+	void testEmptyPropertyListOnCreateAndUpdate() throws JacksonException {
 		MyPojoWithListOfSubProperty pojo = new MyPojoWithListOfSubProperty("urn:ngsi-ld:entity:the-entity");
 		pojo.setMySubProperties(new ArrayList<>());
 
@@ -313,13 +315,13 @@ class JavaObjectMapperTest {
 		assertNotNull(attribute, "The empty list attribute has to be sent on update.");
 		JsonNode instance = attribute.isArray() ? attribute.get(0) : attribute;
 		assertEquals(1, attribute.isArray() ? attribute.size() : 1, "Exactly one Null instance should be sent.");
-		assertEquals("Property", instance.get("type").asText());
-		assertEquals("urn:ngsi-ld:null", instance.get("value").asText(), "The instance should carry the NGSI-LD Null.");
+		assertEquals("Property", instance.get("type").asString());
+		assertEquals("urn:ngsi-ld:null", instance.get("value").asString(), "The instance should carry the NGSI-LD Null.");
 	}
 
 	@DisplayName("The one-argument toEntityVO keeps the create behaviour.")
 	@Test
-	void testDefaultContextIsCreate() throws JsonProcessingException {
+	void testDefaultContextIsCreate() throws JacksonException {
 		MyPojoWithListOfSubEntity myPojoWithListOfSubEntity = new MyPojoWithListOfSubEntity(
 				"urn:ngsi-ld:entity:the-entity");
 		myPojoWithListOfSubEntity.setMySubProperty(new ArrayList<>());
@@ -332,7 +334,7 @@ class JavaObjectMapperTest {
 
 	@DisplayName("Pojo with sub-entity with invalid dataset id should not be mapped.")
 	@Test
-	void testWithInvalidSubEntityDatasetId() throws JsonProcessingException {
+	void testWithInvalidSubEntityDatasetId() throws JacksonException {
 		MyPojoWithInvalidSubEntity myPojoWithSubEntity = new MyPojoWithInvalidSubEntity("urn:ngsi-ld:entity:entity");
 		myPojoWithSubEntity.setMySubProperty(new MySubEntityWithNonURIDatasetId("urn:ngsi-ld:sub-entity:sub-entity"));
 		assertThrows(MappingException.class, () -> javaObjectMapper.toEntityVO(myPojoWithSubEntity),
@@ -341,7 +343,7 @@ class JavaObjectMapperTest {
 
 	@DisplayName("Pojo with sub-entity with invalid relationship object should not be mapped.")
 	@Test
-	void testWithInvalidSubEntityRelObject() throws JsonProcessingException {
+	void testWithInvalidSubEntityRelObject() throws JacksonException {
 		MyPojoWithInvalidSubEntity myPojoWithSubEntity = new MyPojoWithInvalidSubEntity("urn:ngsi-ld:entity:entity");
 		myPojoWithSubEntity.setMySubProperty(new MySubEntityWithNonURIRelObject("urn:ngsi-ld:sub-entity:sub-entity"));
 		assertThrows(MappingException.class, () -> javaObjectMapper.toEntityVO(myPojoWithSubEntity),
