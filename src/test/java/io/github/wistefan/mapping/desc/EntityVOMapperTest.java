@@ -36,7 +36,9 @@ import static org.mockito.Mockito.when;
 
 class EntityVOMapperTest {
 
-	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new EscapeCleaningJsonFactory());
+	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new EscapeCleaningJsonFactory())
+			.registerModule(new NgsiLdMappingModule())
+			.findAndRegisterModules();
 
 	private EntityVOMapper entityVOMapper;
 	private EntitiesRepository entitiesRepository = mock(EntitiesRepository.class);
@@ -48,8 +50,6 @@ class EntityVOMapperTest {
 
 		mappingProperties = new MappingProperties();
 		entityVOMapper = new EntityVOMapper(mappingProperties, OBJECT_MAPPER, entitiesRepository);
-		OBJECT_MAPPER
-				.addMixIn(AdditionalPropertyVO.class, AdditionalPropertyMixin.class);
 	}
 
 	@DisplayName("Map entity containing a relationship.")

@@ -21,6 +21,9 @@ This is a refactor that keeps the build green and makes Step 2 a mechanical API 
   2. The context `ObjectMapper` uses `EscapeCleaningJsonFactory`. Deserializing JSON with an escaped reserved key yields the unescaped name, both as a tree/map key **and** when it is bound to a bean property (e.g. a VO whose `@JsonProperty("@context")` field is read from `"tmfEscaped-@context"`; pick a key that `ReservedWordHandler.canUnescapeDuringParsing` allows). The bean case is the one Jackson 3 breaks (see `EscapeCleaningParser` in Step 2).
   3. The context `ObjectMapper` deserializes a `GeoQueryVO` via `GeoQueryDeserializer` and applies the `AdditionalPropertyMixin`. Reuse a JSON fixture from `EntityVOMapperTest`.
   Use `@ParameterizedTest` where cases form a table. This test guards the DI wiring through the framework switch in Step 2.
+- Implementation notes (found while implementing):
+  - `EntitiesRepository` is a plain interface with no implementation in the library; consumers provide one. `MappingContextTest` therefore declares a nested `@Singleton TestEntitiesRepository`. The dummy ngsi URL is kept but is not strictly needed.
+  - The pom mixed `micronaut-core`/`micronaut-jackson-databind` 4.6.5 with `micronaut-http-client` 4.10.11, which pulls `micronaut-context`/`micronaut-inject` 4.10.11. A real `ApplicationContext` fails with `NoClassDefFoundError: io/micronaut/core/util/AnsiColour`. Step 1 aligns `micronaut.version`, `micronaut-core` and `micronaut-jackson-databind` to 4.10.11.
 - Acceptance: `mvn clean verify` is green on Micronaut 4. No other behaviour change.
 
 ### Step 2: Switch to the Micronaut 5.1.3 platform and migrate to Jackson 3
