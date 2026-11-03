@@ -657,14 +657,30 @@ public class EntityVOMapper extends Mapper {
 	 */
 	private static AdditionalPropertyVO withCompactedValue(AdditionalPropertyVO attributeValue) {
 		if (attributeValue instanceof PropertyVO propertyVO) {
-			return new PropertyVO().value(compactValueKeys(propertyVO.getValue()));
+			return withCompactedValue(propertyVO);
 		}
 		if (attributeValue instanceof PropertyListVO propertyListVO) {
 			PropertyListVO compacted = new PropertyListVO();
-			propertyListVO.forEach(item -> compacted.add(new PropertyVO().value(compactValueKeys(item.getValue()))));
+			propertyListVO.forEach(item -> compacted.add(withCompactedValue(item)));
 			return compacted;
 		}
 		return attributeValue;
+	}
+
+	/**
+	 * Copy of the property with a compacted value; all other members and the sibling sub-attributes are kept as they are.
+	 */
+	private static PropertyVO withCompactedValue(PropertyVO propertyVO) {
+		PropertyVO copy = new PropertyVO()
+				.value(compactValueKeys(propertyVO.getValue()))
+				.observedAt(propertyVO.getObservedAt())
+				.createdAt(propertyVO.getCreatedAt())
+				.modifiedAt(propertyVO.getModifiedAt())
+				.datasetId(propertyVO.getDatasetId())
+				.instanceId(propertyVO.getInstanceId())
+				.unitCode(propertyVO.getUnitCode());
+		Optional.ofNullable(propertyVO.getAdditionalProperties()).ifPresent(siblings -> siblings.forEach(copy::setAdditionalProperties));
+		return copy;
 	}
 
 	/**
