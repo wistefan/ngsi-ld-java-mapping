@@ -49,4 +49,9 @@ Tests in `src/test/java/io/github/wistefan/mapping/desc/`:
 
 Update `AGENTS.md`: add `NgsiLdKeyCompactor.java` to the Project Structure list (one line).
 
+Implementation notes (added during Step 2):
+- Expanded keys that compact to a structural member of a relationship (`type`, `object`, `observedAt`, `createdAt`, `modifiedAt`, `datasetId`, `instanceId`) are dropped before the sub-attribute lookups and the override merge. A user sub-attribute with such a name arrives as `tmfEscaped-<name>`, so the expanded meta key must not shadow it. These keys were never matched on `main` either. Covered by `expandedMetaKeyDoesNotShadowUserSubAttribute`.
+- The generated `EntityVO` only has the per-key `@JsonAnySetter` (it creates a `HashMap`) and no map setter, so the copy in `withOverrides` fills its map through that setter instead of using a `LinkedHashMap`. Jackson-parsed entities already use a `HashMap`, so the order does not change.
+- The `AGENTS.md` line was not added: step agents may not edit `AGENTS.md`. A plan-mode agent has to add it.
+
 Acceptance: `mvn clean verify` passes. The expanded and mixed cases fail on `main` and pass with the change. The compacted case passes on both.

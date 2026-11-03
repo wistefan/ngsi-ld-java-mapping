@@ -29,6 +29,13 @@ public class EntityVOMapper extends Mapper {
 
 	private static final List<String> WELL_KNOWN_PROPERTIES = List.of(EntityVO.JSON_PROPERTY_MODIFIED_AT, EntityVO.JSON_PROPERTY_CREATED_AT, EntityVO.JSON_PROPERTY_LOCATION, EntityVO.JSON_PROPERTY_OBSERVATION_SPACE, EntityVO.JSON_PROPERTY_OPERATION_SPACE, EntityVO.JSON_PROPERTY_DELETED_AT);
 
+	/**
+	 * Structural members of a relationship instance. Their expanded form is NGSI-LD metadata, never a user sub-attribute.
+	 */
+	private static final Set<String> RELATIONSHIP_META_KEYS = Set.of(EntityVO.JSON_PROPERTY_TYPE, RelationshipVO.JSON_PROPERTY_OBJECT,
+			RelationshipVO.JSON_PROPERTY_OBSERVED_AT, RelationshipVO.JSON_PROPERTY_CREATED_AT, RelationshipVO.JSON_PROPERTY_MODIFIED_AT,
+			RelationshipVO.JSON_PROPERTY_DATASET_ID, RelationshipVO.JSON_PROPERTY_INSTANCE_ID);
+
 	private final MappingProperties mappingProperties;
 	private final ObjectMapper objectMapper;
 	private final EntitiesRepository entitiesRepository;
@@ -547,6 +554,7 @@ public class EntityVOMapper extends Mapper {
 			Constructor<T> objectConstructor = targetClass.getDeclaredConstructor(String.class);
 			T constructedObject = objectConstructor.newInstance(entityID);
 
+			Map<String, AdditionalPropertyVO> subAttributes = compactSubAttributes(relationshipVO.getAdditionalProperties());
 			Map<String, Method> attributeSetters = getAttributeSetterMethodMap(constructedObject);
 
 			return Mono.zip(attributeSetters.entrySet().stream()
@@ -576,21 +584,21 @@ public class EntityVOMapper extends Mapper {
 						};
 
 						// try to find the attribute from the additional properties
-						if (optionalProperty.isEmpty() && relationshipVO.getAdditionalProperties() != null && relationshipVO.getAdditionalProperties().containsKey(field)) {
-							optionalProperty = Optional.ofNullable(relationshipVO.getAdditionalProperties().get(field));
+						if (optionalProperty.isEmpty() && subAttributes != null && subAttributes.containsKey(field)) {
+							optionalProperty = Optional.ofNullable(subAttributes.get(field));
 						}
 
 						// the field name might collide with a reserved word (e.g. "unitCode"), in which case
 						// it stays escaped on the wire even inside a relationship - try that variant too.
-						if (optionalProperty.isEmpty() && relationshipVO.getAdditionalProperties() != null) {
+						if (optionalProperty.isEmpty() && subAttributes != null) {
 							optionalProperty = Optional.ofNullable(
-									relationshipVO.getAdditionalProperties().get(ReservedWordHandler.escapeReservedWords(field)));
+									subAttributes.get(ReservedWordHandler.escapeReservedWords(field)));
 						}
 
 						// fall back to any legacy name still present in already-stored data, e.g. after a rename
-						if (optionalProperty.isEmpty() && relationshipVO.getAdditionalProperties() != null) {
+						if (optionalProperty.isEmpty() && subAttributes != null) {
 							for (String legacyName : setterAnnotation.legacyNames()) {
-								AdditionalPropertyVO legacyValue = relationshipVO.getAdditionalProperties().get(legacyName);
+								AdditionalPropertyVO legacyValue = subAttributes.get(legacyName);
 								if (legacyValue != null) {
 									optionalProperty = Optional.of(legacyValue);
 									break;
@@ -601,16 +609,16 @@ public class EntityVOMapper extends Mapper {
 						return optionalProperty.map(attributeValue ->
 								switch (setterAnnotation.value()) {
 									case PROPERTY, GEO_PROPERTY ->
-											handleProperty(attributeValue, constructedObject, setterMethod, setterAnnotation.targetClass());
+											handleProperty(withCompactedValue(attributeValue), constructedObject, setterMethod, setterAnnotation.targetClass());
 									case RELATIONSHIP ->
-											getRelationshipMap(relationshipVO.getAdditionalProperties(), targetClass)
+											getRelationshipMap(subAttributes, targetClass)
 													.map(rm -> handleRelationship(attributeValue, constructedObject, rm, setterMethod, setterAnnotation));
 									//resolve objects;
 									case RELATIONSHIP_LIST ->
-											getRelationshipMap(relationshipVO.getAdditionalProperties(), targetClass)
+											getRelationshipMap(subAttributes, targetClass)
 													.map(rm -> handleRelationshipList(attributeValue, constructedObject, rm, setterMethod, setterAnnotation));
 									case PROPERTY_LIST ->
-											handlePropertyList(attributeValue, constructedObject, setterMethod, setterAnnotation);
+											handlePropertyList(withCompactedValue(attributeValue), constructedObject, setterMethod, setterAnnotation);
 									default ->
 											Mono.error(new MappingException(String.format("Received type %s is not supported.", setterAnnotation.value())));
 								}).orElse(Mono.just(constructedObject));
@@ -622,6 +630,41 @@ public class EntityVOMapper extends Mapper {
 		} catch (InvocationTargetException | InstantiationException | IllegalAccessException e) {
 			return Mono.error(new MappingException(String.format("Was not able to create instance of %s.", targetClass), e));
 		}
+	}
+
+	/**
+	 * Sub-attributes of a relationship instance under their compact names, without expanded NGSI-LD meta keys.
+	 */
+	private static Map<String, AdditionalPropertyVO> compactSubAttributes(Map<String, AdditionalPropertyVO> subAttributes) {
+		if (subAttributes == null || subAttributes.keySet().stream().noneMatch(EntityVOMapper::isExpandedMetaKey)) {
+			return NgsiLdKeyCompactor.compactKeys(subAttributes);
+		}
+		Map<String, AdditionalPropertyVO> withoutMetaKeys = new LinkedHashMap<>(subAttributes);
+		withoutMetaKeys.keySet().removeIf(EntityVOMapper::isExpandedMetaKey);
+		return NgsiLdKeyCompactor.compactKeys(withoutMetaKeys);
+	}
+
+	/**
+	 * Whether the key is an expanded name of a relationship's structural member, e.g. {@code https://uri.etsi.org/ngsi-ld/observedAt}.
+	 */
+	private static boolean isExpandedMetaKey(String key) {
+		String compacted = NgsiLdKeyCompactor.compact(key);
+		return !Objects.equals(compacted, key) && RELATIONSHIP_META_KEYS.contains(compacted);
+	}
+
+	/**
+	 * Copy of the given sub-attribute with expanded keys compacted throughout its value; other types are returned as they are.
+	 */
+	private static AdditionalPropertyVO withCompactedValue(AdditionalPropertyVO attributeValue) {
+		if (attributeValue instanceof PropertyVO propertyVO) {
+			return new PropertyVO().value(compactValueKeys(propertyVO.getValue()));
+		}
+		if (attributeValue instanceof PropertyListVO propertyListVO) {
+			PropertyListVO compacted = new PropertyListVO();
+			propertyListVO.forEach(item -> compacted.add(new PropertyVO().value(compactValueKeys(item.getValue()))));
+			return compacted;
+		}
+		return attributeValue;
 	}
 
 	/**
@@ -836,6 +879,27 @@ public class EntityVOMapper extends Mapper {
 	}
 
 	/**
+	 * Recursively compact expanded NGSI-LD keys in a Map/List value tree, returning a copy.
+	 */
+	private static Object compactValueKeys(Object value) {
+		if (value instanceof Map<?, ?> map) {
+			Map<String, Object> result = new LinkedHashMap<>(map.size());
+			for (Map.Entry<?, ?> e : map.entrySet()) {
+				result.put(String.valueOf(e.getKey()), compactValueKeys(e.getValue()));
+			}
+			return NgsiLdKeyCompactor.compactKeys(result);
+		}
+		if (value instanceof List<?> list) {
+			List<Object> result = new ArrayList<>(list.size());
+			for (Object item : list) {
+				result.add(compactValueKeys(item));
+			}
+			return result;
+		}
+		return value;
+	}
+
+	/**
 	 * Retrieve the object from a relationship and return it as a java object of class T. All sub relationships will be evaluated, too.
 	 *
 	 * @param relationshipVO the relationship entry
@@ -862,9 +926,28 @@ public class EntityVOMapper extends Mapper {
 		var entityVO = optionalEntityVO.get();
 		//merge with override properties
 		if (additionalPropertyVOMap != null) {
-			entityVO.getAdditionalProperties().putAll(additionalPropertyVOMap);
+			entityVO = withOverrides(entityVO, compactSubAttributes(additionalPropertyVOMap));
 		}
 		return fromEntityVO(entityVO, targetClass);
+	}
+
+	/**
+	 * Shallow copy of the entity with the overrides merged in. The fetched entity can be shared by several relationships, so it stays untouched.
+	 */
+	private static EntityVO withOverrides(EntityVO entityVO, Map<String, AdditionalPropertyVO> overrides) {
+		EntityVO copy = new EntityVO()
+				.id(entityVO.getId())
+				.type(entityVO.getType())
+				.atContext(entityVO.getAtContext())
+				.location(entityVO.getLocation())
+				.observationSpace(entityVO.getObservationSpace())
+				.operationSpace(entityVO.getOperationSpace())
+				.createdAt(entityVO.getCreatedAt())
+				.modifiedAt(entityVO.getModifiedAt())
+				.deletedAt(entityVO.getDeletedAt());
+		Optional.ofNullable(entityVO.getAdditionalProperties()).ifPresent(properties -> properties.forEach(copy::setAdditionalProperties));
+		overrides.forEach(copy::setAdditionalProperties);
+		return copy;
 	}
 
 	/**
