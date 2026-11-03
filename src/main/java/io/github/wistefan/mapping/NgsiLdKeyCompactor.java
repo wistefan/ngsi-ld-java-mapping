@@ -39,7 +39,8 @@ public final class NgsiLdKeyCompactor {
 	}
 
 	/**
-	 * Returns a map with compacted keys in insertion order; an already compact key wins over an expanded one.
+	 * Returns a map with compacted keys in insertion order; an already compact key wins over an expanded one,
+	 * and among expanded keys that compact to the same name the first in iteration order wins.
 	 * Returns the input itself when no key needs compaction, and null for null.
 	 */
 	public static <V> Map<String, V> compactKeys(Map<String, V> map) {

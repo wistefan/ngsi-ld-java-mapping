@@ -18,6 +18,8 @@ class NgsiLdKeyCompactorTest {
 
 	private static final String COMPACT_VALUE = "compact";
 	private static final String EXPANDED_VALUE = "expanded";
+	private static final String FIRST_VALUE = "first";
+	private static final String SECOND_VALUE = "second";
 
 	@ParameterizedTest(name = "{0}")
 	@MethodSource("compactCases")
@@ -71,6 +73,23 @@ class NgsiLdKeyCompactorTest {
 				Arguments.of("name", CORE_CONTEXT_PREFIX + "name", "name", compactFirst),
 				Arguments.of("validFor", DEFAULT_CONTEXT_PREFIX + "validFor", "validFor", compactFirst),
 				Arguments.of("@referredType", DEFAULT_CONTEXT_PREFIX + "tmfEscaped-@referredType", "@referredType", compactFirst)));
+	}
+
+	@ParameterizedTest(name = "{0} first")
+	@MethodSource("expandedCollisionCases")
+	void firstExpandedKeyWinsOnExpandedCollision(String firstKey, String secondKey) {
+		Map<String, String> input = new LinkedHashMap<>();
+		input.put(firstKey, FIRST_VALUE);
+		input.put(secondKey, SECOND_VALUE);
+
+		assertEquals(Map.of("name", FIRST_VALUE), NgsiLdKeyCompactor.compactKeys(input),
+				"The first expanded key in iteration order should win.");
+	}
+
+	static Stream<Arguments> expandedCollisionCases() {
+		return Stream.of(
+				Arguments.of(CORE_CONTEXT_PREFIX + "name", DEFAULT_CONTEXT_PREFIX + "name"),
+				Arguments.of(DEFAULT_CONTEXT_PREFIX + "name", CORE_CONTEXT_PREFIX + "name"));
 	}
 
 	@Test
