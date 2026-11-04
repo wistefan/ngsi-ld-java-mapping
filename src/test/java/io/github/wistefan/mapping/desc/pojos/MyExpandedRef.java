@@ -14,6 +14,7 @@ import lombok.Setter;
 import lombok.ToString;
 
 import java.net.URI;
+import java.util.List;
 
 /**
  * Relationship target built from the sub-attributes that Orion-LD returns under expanded names.
@@ -52,4 +53,8 @@ public class MyExpandedRef {
 	@Getter(onMethod = @__({@AttributeGetter(value = AttributeType.PROPERTY, targetName = "associationSpec")}))
 	@Setter(onMethod = @__({@AttributeSetter(value = AttributeType.PROPERTY, targetName = "associationSpec", targetClass = MySubPropertyRefOrValue.class)}))
 	private MySubPropertyRefOrValue associationSpec;
+
+	@Getter(onMethod = @__({@AttributeGetter(value = AttributeType.PROPERTY_LIST, targetName = "validPeriods")}))
+	@Setter(onMethod = @__({@AttributeSetter(value = AttributeType.PROPERTY_LIST, targetName = "validPeriods", targetClass = MyTimePeriod.class)}))
+	private List<MyTimePeriod> validPeriods;
 }

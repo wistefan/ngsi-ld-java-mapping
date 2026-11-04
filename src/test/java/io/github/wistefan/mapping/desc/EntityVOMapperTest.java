@@ -993,6 +993,53 @@ class EntityVOMapperTest {
 				"Nested keys should be compacted, with the compact key winning on a collision.");
 	}
 
+	private static String timePeriodProperty(String prefix, String start) {
+		return "{\"type\":\"Property\",\"value\":{\"%1$sstartDateTime\":\"%2$s\",\"%1$sendDateTime\":\"2026-12-31T00:00:00Z\"}}"
+				.formatted(prefix, start);
+	}
+
+	private static MyTimePeriod timePeriod(String start) {
+		MyTimePeriod timePeriod = new MyTimePeriod();
+		timePeriod.setStartDateTime(start);
+		timePeriod.setEndDateTime("2026-12-31T00:00:00Z");
+		return timePeriod;
+	}
+
+	private static Stream<Arguments> subAttributePropertyLists() {
+		String firstStart = "2026-01-01T00:00:00Z";
+		String secondStart = "2026-06-01T00:00:00Z";
+		return Stream.of(
+				Arguments.of("property list",
+						"[" + timePeriodProperty(DEFAULT_CONTEXT_PREFIX, firstStart) + "," + timePeriodProperty(DEFAULT_CONTEXT_PREFIX, secondStart) + "]",
+						List.of(timePeriod(firstStart), timePeriod(secondStart))),
+				Arguments.of("single-element list returned as a flat property",
+						timePeriodProperty(DEFAULT_CONTEXT_PREFIX, firstStart),
+						List.of(timePeriod(firstStart))));
+	}
+
+	@DisplayName("Property-list sub-attributes of relationship instances get their nested keys compacted per item.")
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("subAttributePropertyLists")
+	void compactNestedKeysInPropertyListSubAttributes(String description, String validPeriods, List<MyTimePeriod> expectedPeriods) throws JacksonException {
+		when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of()));
+		String instanceTemplate = "{\"type\":\"Relationship\",\"object\":\"%1$s\",\"datasetId\":\"%1$s\","
+				+ "\"" + DEFAULT_CONTEXT_PREFIX + "validPeriods\":%2$s}";
+		String parentEntityString = "{\"id\":\"urn:ngsi-ld:complex-pojo:entity\",\"type\":\"complex-pojo\",\"refs\":["
+				+ instanceTemplate.formatted(REF_1, validPeriods) + ","
+				+ instanceTemplate.formatted(REF_2, validPeriods) + "]}";
+		EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
+
+		MyExpandedRef ref1 = new MyExpandedRef(REF_1);
+		ref1.setValidPeriods(expectedPeriods);
+		MyExpandedRef ref2 = new MyExpandedRef(REF_2);
+		ref2.setValidPeriods(expectedPeriods);
+		MyPojoWithExpandedRefList expectedPojo = new MyPojoWithExpandedRefList("urn:ngsi-ld:complex-pojo:entity");
+		expectedPojo.setRefs(List.of(ref1, ref2));
+
+		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithExpandedRefList.class).block(),
+				"Every list item should be mapped from its compacted value keys.");
+	}
+
 	private static Stream<Arguments> relationshipOverrides() {
 		String withName = "{\"id\":\"" + SHARED_SUB_ENTITY + "\",\"type\":\"sub-entity\",\"name\":{\"type\":\"Property\",\"value\":\"fetched\"}}";
 		String withoutAttributes = "{\"id\":\"" + SHARED_SUB_ENTITY + "\",\"type\":\"sub-entity\"}";
