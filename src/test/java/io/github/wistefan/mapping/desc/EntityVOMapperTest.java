@@ -960,6 +960,41 @@ class EntityVOMapperTest {
 				"Refs built from properties should not be fetched from the broker.");
 	}
 
+	private static Stream<Arguments> nestedSubAttributeValues() {
+		return Stream.of(
+				Arguments.of("expanded nested key is compacted",
+						"{\"" + DEFAULT_CONTEXT_PREFIX + "name\":\"spec\"}"),
+				Arguments.of("compact nested key wins, expanded one listed last",
+						"{\"name\":\"spec\",\"" + DEFAULT_CONTEXT_PREFIX + "name\":\"dropped\"}"),
+				Arguments.of("compact nested key wins, expanded one listed first",
+						"{\"" + DEFAULT_CONTEXT_PREFIX + "name\":\"dropped\",\"name\":\"spec\"}"));
+	}
+
+	@DisplayName("Nested value keys of relationship sub-attributes are compacted even when the sub-attribute names are compact.")
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("nestedSubAttributeValues")
+	void compactNestedKeysUnderCompactSubAttributes(String description, String associationSpecValue) throws JacksonException {
+		when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of()));
+		String instanceTemplate = "{\"type\":\"Relationship\",\"object\":\"%1$s\",\"datasetId\":\"%1$s\","
+				+ "\"associationSpec\":{\"type\":\"Property\",\"value\":%2$s}}";
+		String parentEntityString = "{\"id\":\"urn:ngsi-ld:complex-pojo:entity\",\"type\":\"complex-pojo\",\"refs\":["
+				+ instanceTemplate.formatted(REF_1, associationSpecValue) + ","
+				+ instanceTemplate.formatted(REF_2, associationSpecValue) + "]}";
+		EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
+
+		MySubPropertyRefOrValue associationSpec = new MySubPropertyRefOrValue();
+		associationSpec.setName("spec");
+		MyExpandedRef ref1 = new MyExpandedRef(REF_1);
+		ref1.setAssociationSpec(associationSpec);
+		MyExpandedRef ref2 = new MyExpandedRef(REF_2);
+		ref2.setAssociationSpec(associationSpec);
+		MyPojoWithExpandedRefList expectedPojo = new MyPojoWithExpandedRefList("urn:ngsi-ld:complex-pojo:entity");
+		expectedPojo.setRefs(List.of(ref1, ref2));
+
+		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithExpandedRefList.class).block(),
+				"Nested keys should be compacted, with the compact key winning on a collision.");
+	}
+
 	private static Stream<Arguments> relationshipOverrides() {
 		String withName = "{\"id\":\"" + SHARED_SUB_ENTITY + "\",\"type\":\"sub-entity\",\"name\":{\"type\":\"Property\",\"value\":\"fetched\"}}";
 		String withoutAttributes = "{\"id\":\"" + SHARED_SUB_ENTITY + "\",\"type\":\"sub-entity\"}";

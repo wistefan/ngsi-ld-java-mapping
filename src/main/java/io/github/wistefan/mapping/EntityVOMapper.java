@@ -654,6 +654,8 @@ public class EntityVOMapper extends Mapper {
 
 	/**
 	 * Copy of the given sub-attribute with expanded keys compacted throughout its value; other types are returned as they are.
+	 * Runs on compacted input too, so a nested user key such as {@code https://uri.etsi.org/ngsi-ld/default-context/foo} becomes
+	 * {@code foo}, and is dropped if a compact {@code foo} sits next to it.
 	 */
 	private static AdditionalPropertyVO withCompactedValue(AdditionalPropertyVO attributeValue) {
 		if (attributeValue instanceof PropertyVO propertyVO) {
