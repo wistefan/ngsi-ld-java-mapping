@@ -24,6 +24,11 @@ public final class JsonLdContext {
 	 */
 	private static final Pattern ABSOLUTE_IRI = Pattern.compile("^(urn:|[A-Za-z][A-Za-z0-9+.-]*://)");
 
+	/**
+	 * Separator between the scheme and the rest of an IRI.
+	 */
+	private static final char SCHEME_SEPARATOR = ':';
+
 	private final Map<String, String> termsByIri;
 	private final List<String> vocabularies;
 
@@ -68,7 +73,8 @@ public final class JsonLdContext {
 	 * @return true if the name is an absolute IRI
 	 */
 	public static boolean isAbsoluteIri(String key) {
-		return key != null && ABSOLUTE_IRI.matcher(key).find();
+		// the scheme separator is absent from virtually every attribute name, checking it first keeps the regex off the hot path
+		return key != null && key.indexOf(SCHEME_SEPARATOR) > 0 && ABSOLUTE_IRI.matcher(key).find();
 	}
 
 	/**

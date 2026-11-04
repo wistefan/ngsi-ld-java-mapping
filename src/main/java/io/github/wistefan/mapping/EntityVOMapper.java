@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.fiware.ngsi.model.*;
 import reactor.core.publisher.Mono;
 
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -46,12 +47,24 @@ public class EntityVOMapper extends Mapper {
 	private final MappingProperties mappingProperties;
 	private final ObjectMapper objectMapper;
 	private final EntitiesRepository entitiesRepository;
+	private final NgsiLdKeyCompactor keyCompactor;
 
+	/**
+	 * Mapper compacting expanded attribute names with the built-in NGSI-LD prefixes only. Use
+	 * {@link #EntityVOMapper(MappingProperties, ObjectMapper, EntitiesRepository, NgsiLdKeyCompactor)} to also compact
+	 * names a broker expanded against the configured context.
+	 */
 	public EntityVOMapper(MappingProperties mappingProperties, ObjectMapper objectMapper, EntitiesRepository entitiesRepository) {
+		this(mappingProperties, objectMapper, entitiesRepository, new NgsiLdKeyCompactor());
+	}
+
+	@Inject
+	public EntityVOMapper(MappingProperties mappingProperties, ObjectMapper objectMapper, EntitiesRepository entitiesRepository, NgsiLdKeyCompactor keyCompactor) {
 		requireMappingModule(objectMapper);
 		this.mappingProperties = mappingProperties;
 		this.objectMapper = objectMapper;
 		this.entitiesRepository = entitiesRepository;
+		this.keyCompactor = keyCompactor;
 	}
 
 	/**
@@ -648,23 +661,23 @@ public class EntityVOMapper extends Mapper {
 	/**
 	 * Sub-attributes of a relationship instance under their compact names, without expanded NGSI-LD meta keys.
 	 */
-	private static Map<String, AdditionalPropertyVO> compactSubAttributes(Map<String, AdditionalPropertyVO> subAttributes) {
-		if (subAttributes == null || subAttributes.keySet().stream().noneMatch(EntityVOMapper::isExpandedMetaKey)) {
-			return NgsiLdKeyCompactor.compactKeys(subAttributes);
+	private Map<String, AdditionalPropertyVO> compactSubAttributes(Map<String, AdditionalPropertyVO> subAttributes) {
+		if (subAttributes == null || subAttributes.keySet().stream().noneMatch(this::isExpandedMetaKey)) {
+			return keyCompactor.compactKeys(subAttributes);
 		}
 		Map<String, AdditionalPropertyVO> withoutMetaKeys = new LinkedHashMap<>(subAttributes);
-		withoutMetaKeys.keySet().removeIf(EntityVOMapper::isExpandedMetaKey);
-		return NgsiLdKeyCompactor.compactKeys(withoutMetaKeys);
+		withoutMetaKeys.keySet().removeIf(this::isExpandedMetaKey);
+		return keyCompactor.compactKeys(withoutMetaKeys);
 	}
 
 	/**
 	 * Values of the expanded meta keys dropped by {@link #compactSubAttributes(Map)}, by compact name. Never null.
 	 */
-	private static Map<String, AdditionalPropertyVO> expandedMetaValues(Map<String, AdditionalPropertyVO> subAttributes) {
+	private Map<String, AdditionalPropertyVO> expandedMetaValues(Map<String, AdditionalPropertyVO> subAttributes) {
 		Map<String, AdditionalPropertyVO> metaValues = new HashMap<>();
 		Optional.ofNullable(subAttributes).ifPresent(attributes -> attributes.forEach((key, value) -> {
 			if (isExpandedMetaKey(key)) {
-				metaValues.putIfAbsent(NgsiLdKeyCompactor.compact(key), value);
+				metaValues.putIfAbsent(keyCompactor.compact(key), value);
 			}
 		}));
 		return metaValues;
@@ -673,8 +686,8 @@ public class EntityVOMapper extends Mapper {
 	/**
 	 * Whether the key is an expanded name of a relationship's structural member, e.g. {@code https://uri.etsi.org/ngsi-ld/observedAt}.
 	 */
-	private static boolean isExpandedMetaKey(String key) {
-		String compacted = NgsiLdKeyCompactor.compact(key);
+	private boolean isExpandedMetaKey(String key) {
+		String compacted = keyCompactor.compact(key);
 		return !Objects.equals(compacted, key) && RELATIONSHIP_META_KEYS.contains(compacted);
 	}
 
@@ -683,7 +696,7 @@ public class EntityVOMapper extends Mapper {
 	 * Runs on compacted input too, so a nested user key such as {@code https://uri.etsi.org/ngsi-ld/default-context/foo} becomes
 	 * {@code foo}, and is dropped if a compact {@code foo} sits next to it.
 	 */
-	private static AdditionalPropertyVO withCompactedValue(AdditionalPropertyVO attributeValue) {
+	private AdditionalPropertyVO withCompactedValue(AdditionalPropertyVO attributeValue) {
 		if (attributeValue instanceof PropertyVO propertyVO) {
 			return withCompactedValue(propertyVO);
 		}
@@ -698,7 +711,7 @@ public class EntityVOMapper extends Mapper {
 	/**
 	 * Copy of the property with a compacted value; all other members and the sibling sub-attributes are kept as they are.
 	 */
-	private static PropertyVO withCompactedValue(PropertyVO propertyVO) {
+	private PropertyVO withCompactedValue(PropertyVO propertyVO) {
 		PropertyVO copy = new PropertyVO()
 				.value(compactValueKeys(propertyVO.getValue()))
 				.observedAt(propertyVO.getObservedAt())
@@ -925,13 +938,13 @@ public class EntityVOMapper extends Mapper {
 	/**
 	 * Recursively compact expanded NGSI-LD keys in a Map/List value tree, returning a copy.
 	 */
-	private static Object compactValueKeys(Object value) {
+	private Object compactValueKeys(Object value) {
 		if (value instanceof Map<?, ?> map) {
 			Map<String, Object> result = new LinkedHashMap<>(map.size());
 			for (Map.Entry<?, ?> e : map.entrySet()) {
 				result.put(String.valueOf(e.getKey()), compactValueKeys(e.getValue()));
 			}
-			return NgsiLdKeyCompactor.compactKeys(result);
+			return keyCompactor.compactKeys(result);
 		}
 		if (value instanceof List<?> list) {
 			List<Object> result = new ArrayList<>(list.size());

@@ -25,11 +25,16 @@ src/main/java/io/github/wistefan/mapping/
   AdditionalProperty{Deserializer,TypeResolver,Mixin}.java  custom polymorphic deser of AdditionalPropertyVO
   GeoQueryDeserializer.java               returns empty GeoQueryVO
   WellknownPreservingBase.java            keeps the well-known attributes when mapping unmapped properties
+  NgsiLdKeyCompactor.java                 expanded attribute name -> term (built-in NGSI-LD prefixes + configured context)
+  JsonLdContext.java                      resolved context: term by expanded IRI plus the @vocab prefixes
+  JsonLdContextResolver.java              builds the JsonLdContext from the document at mapping.context-url (lazy, cached, fail-soft)
+  JsonLdContextLoader.java, HttpJsonLdContextLoader.java  retrieval of the context document (@Secondary, replaceable by a bean)
   ReservedWordHandler.java, MappingProperties.java (@ConfigurationProperties("mapping"))
   annotations/                            @MappingEnabled, @EntityId, @AttributeGetter/Setter, ...
   mixins/                                 Jackson mixins used by CacheSerdeableObjectMapper
 src/test/java/io/github/wistefan/mapping/
   ReservedWordHandlerTest.java, MappingContextTest.java, EscapeCleaningJsonFactoryTest.java
+  NgsiLdKeyCompactorTest.java, JsonLdContextTest.java, JsonLdContextResolverTest.java, HttpJsonLdContextLoaderTest.java
   desc/*Test.java                         mapper/serializer tests; build ObjectMappers by hand (no DI)
   desc/pojos/                             test POJOs
 .github/workflows/                        test.yaml (mvn clean test jacoco:report), check.yml, release.yaml

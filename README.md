@@ -40,6 +40,38 @@ jackson:
     write-dates-as-timestamps: true
 ```
 
+## Configuration
+
+```yaml
+mapping:
+  # context sent with the entities written by the library, and the context expanded attribute names are compacted against
+  context-url: https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld
+  # fail the mapping when a relationship cannot be resolved
+  strict-relationships: true
+  # compact attribute names that the broker returned expanded under the context at context-url
+  compact-against-context: true
+  context-retrieval-timeout: 10s
+  context-retrieval-retry-delay: 60s
+```
+
+### Compaction of expanded attribute names
+
+Some brokers return the sub-attributes of a relationship under their expanded names. Orion-LD 1.9.0 does so for the
+instances of a multi-instance relationship. The library always compacts the NGSI-LD core
+(`https://uri.etsi.org/ngsi-ld/`) and default-context (`https://uri.etsi.org/ngsi-ld/default-context/`) prefixes.
+
+A deployment that points the broker at its own context - for Orion-LD the `general.contextUrl` setting - gets those
+names expanded under that context's IRIs instead. To map them back, the library resolves `mapping.context-url` and
+compacts against the terms and the `@vocab` of that document. Without it, the sub-attributes of such a relationship
+cannot be matched to their setters and the target objects are built from their id alone.
+
+The document is retrieved once, over HTTP, and only when an attribute name actually turns up as an IRI that the
+built-in prefixes do not cover - a deployment using the core context never retrieves it. Retrieval is fail-soft: if
+the document is unreachable or invalid, the mapping continues with the built-in prefixes and the retrieval is retried
+at the earliest after `context-retrieval-retry-delay`. To serve the context from somewhere else, for instance from the
+classpath or from a server that requires authentication, provide a `JsonLdContextLoader` bean - it takes precedence
+over the built-in `HttpJsonLdContextLoader`.
+
 ## Usage
 
 In order to enable the mappers to translate correctly between both worlds, the domain object has to be annotated
