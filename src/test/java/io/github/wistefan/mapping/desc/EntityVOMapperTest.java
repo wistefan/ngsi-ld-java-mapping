@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.ArgumentCaptor;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
@@ -33,8 +32,10 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Matchers.anyList;
-import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.AdditionalMatchers.not;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -954,10 +955,7 @@ class EntityVOMapperTest {
 
 		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithExpandedRefList.class).block(),
 				"Both refs should be fully populated from their sub-attributes.");
-		ArgumentCaptor<List> requestedIds = ArgumentCaptor.forClass(List.class);
-		verify(entitiesRepository, atLeastOnce()).getEntities(requestedIds.capture());
-		assertTrue(requestedIds.getAllValues().stream().allMatch(List::isEmpty),
-				"Refs built from properties should not be fetched from the broker.");
+		verify(entitiesRepository, never()).getEntities(not(eq(List.<URI>of())));
 	}
 
 	private static Stream<Arguments> nestedSubAttributeValues() {
@@ -1060,6 +1058,26 @@ class EntityVOMapperTest {
 
 		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityWellKnown.class).block(),
 				"The escaped user sub-attribute should be used, not the expanded meta key.");
+	}
+
+	@DisplayName("An expanded relationship member is used when the typed member is empty and no user sub-attribute exists.")
+	@Test
+	void expandedMetaKeyFillsEmptyRelationshipMember() throws JacksonException {
+		when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of()));
+		String parentEntityString = "{\"id\":\"urn:ngsi-ld:complex-pojo:entity\",\"type\":\"complex-pojo\","
+				+ "\"mySubProperty\":{\"type\":\"Relationship\",\"object\":\"urn:ngsi-ld:sub-entity:entity\","
+				+ "\"" + CORE_PREFIX + "observedAt\":\"2027-02-02T00:00:00Z\","
+				+ "\"" + CORE_PREFIX + "datasetId\":\"urn:ngsi-ld:dataset:expanded\"}}";
+		EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
+
+		MySubPropertyEntityWithWellKnown expectedSubEntity = new MySubPropertyEntityWithWellKnown("urn:ngsi-ld:sub-entity:entity");
+		expectedSubEntity.setObservedAt(Instant.parse("2027-02-02T00:00:00Z"));
+		expectedSubEntity.setDatasetId("urn:ngsi-ld:dataset:expanded");
+		MyPojoWithSubEntityWellKnown expectedPojo = new MyPojoWithSubEntityWellKnown("urn:ngsi-ld:complex-pojo:entity");
+		expectedPojo.setMySubProperty(expectedSubEntity);
+
+		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityWellKnown.class).block(),
+				"The expanded members should fill the empty typed members.");
 	}
 
 	@DisplayName("Expanded keys in top-level property values are returned unchanged.")

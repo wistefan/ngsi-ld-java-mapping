@@ -36,6 +36,13 @@ public class EntityVOMapper extends Mapper {
 			RelationshipVO.JSON_PROPERTY_OBSERVED_AT, RelationshipVO.JSON_PROPERTY_CREATED_AT, RelationshipVO.JSON_PROPERTY_MODIFIED_AT,
 			RelationshipVO.JSON_PROPERTY_DATASET_ID, RelationshipVO.JSON_PROPERTY_INSTANCE_ID);
 
+	/**
+	 * Members of a relationship instance that a POJO setter can receive from the typed {@link RelationshipVO} fields.
+	 */
+	private static final Set<String> MAPPABLE_RELATIONSHIP_MEMBERS = Set.of(RelationshipVO.JSON_PROPERTY_OBSERVED_AT,
+			RelationshipVO.JSON_PROPERTY_CREATED_AT, RelationshipVO.JSON_PROPERTY_MODIFIED_AT, RelationshipVO.JSON_PROPERTY_DATASET_ID,
+			RelationshipVO.JSON_PROPERTY_INSTANCE_ID);
+
 	private final MappingProperties mappingProperties;
 	private final ObjectMapper objectMapper;
 	private final EntitiesRepository entitiesRepository;
@@ -555,6 +562,7 @@ public class EntityVOMapper extends Mapper {
 			T constructedObject = objectConstructor.newInstance(entityID);
 
 			Map<String, AdditionalPropertyVO> subAttributes = compactSubAttributes(relationshipVO.getAdditionalProperties());
+			Map<String, AdditionalPropertyVO> expandedMembers = expandedMetaValues(relationshipVO.getAdditionalProperties());
 			Map<String, Method> attributeSetters = getAttributeSetterMethodMap(constructedObject);
 
 			return Mono.zip(attributeSetters.entrySet().stream()
@@ -606,6 +614,11 @@ public class EntityVOMapper extends Mapper {
 							}
 						}
 
+						// a broker that expands the relationship's own members leaves the typed field empty; a user sub-attribute still wins
+						if (optionalProperty.isEmpty() && MAPPABLE_RELATIONSHIP_MEMBERS.contains(field)) {
+							optionalProperty = Optional.ofNullable(expandedMembers.get(field));
+						}
+
 						return optionalProperty.map(attributeValue ->
 								switch (setterAnnotation.value()) {
 									case PROPERTY, GEO_PROPERTY ->
@@ -642,6 +655,19 @@ public class EntityVOMapper extends Mapper {
 		Map<String, AdditionalPropertyVO> withoutMetaKeys = new LinkedHashMap<>(subAttributes);
 		withoutMetaKeys.keySet().removeIf(EntityVOMapper::isExpandedMetaKey);
 		return NgsiLdKeyCompactor.compactKeys(withoutMetaKeys);
+	}
+
+	/**
+	 * Values of the expanded meta keys dropped by {@link #compactSubAttributes(Map)}, by compact name. Never null.
+	 */
+	private static Map<String, AdditionalPropertyVO> expandedMetaValues(Map<String, AdditionalPropertyVO> subAttributes) {
+		Map<String, AdditionalPropertyVO> metaValues = new HashMap<>();
+		Optional.ofNullable(subAttributes).ifPresent(attributes -> attributes.forEach((key, value) -> {
+			if (isExpandedMetaKey(key)) {
+				metaValues.putIfAbsent(NgsiLdKeyCompactor.compact(key), value);
+			}
+		}));
+		return metaValues;
 	}
 
 	/**
