@@ -17,10 +17,10 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Builds the {@link JsonLdContext} for the context configured at {@link MappingProperties#getContextUrl()}.
+ * Builds the {@link JsonLdContext} for the context configured at {@code mapping.context-url}.
  * The document is retrieved at most once, on the first key that actually needs it, and the result is kept for the
  * lifetime of the bean. A retrieval that failed is retried at the earliest after
- * {@link MappingProperties#getContextRetrievalRetryDelay()}, so an unreachable context does not cause a request per
+ * {@code mapping.context-retrieval-retry-delay}, so an unreachable context does not cause a request per
  * mapped entity.
  */
 @Slf4j

@@ -13,7 +13,7 @@ import java.util.function.Supplier;
  * Turns expanded attribute names back into their terms.
  * Orion-LD 1.9.0 returns the sub-attributes of RELATIONSHIP_LIST instances under their expanded names. Which IRIs
  * those are depends on the context the broker expands against: the NGSI-LD core and default-context prefixes are
- * known here, anything else is resolved against the context configured at {@link MappingProperties#getContextUrl()}.
+ * known here, anything else is resolved against the context configured at {@code mapping.context-url}.
  */
 @Singleton
 public final class NgsiLdKeyCompactor {
