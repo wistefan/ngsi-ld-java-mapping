@@ -16,6 +16,9 @@ import org.fiware.ngsi.model.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
@@ -24,10 +27,16 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Matchers.anyList;
+import static org.mockito.AdditionalMatchers.not;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class EntityVOMapperTest {
@@ -880,6 +889,256 @@ class EntityVOMapperTest {
 
 		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityListFrom.class).block(),
 				"Each relationship in the list should independently fall back to the legacy name when the primary name is absent.");
+	}
+
+	private static final String CORE_PREFIX = "https://uri.etsi.org/ngsi-ld/";
+	private static final String DEFAULT_CONTEXT_PREFIX = "https://uri.etsi.org/ngsi-ld/default-context/";
+	private static final String COMPACT = "";
+	private static final String REF_1 = "urn:ngsi-ld:sub-entity:ref-1";
+	private static final String REF_2 = "urn:ngsi-ld:sub-entity:ref-2";
+	private static final String SHARED_SUB_ENTITY = "urn:ngsi-ld:sub-entity:shared";
+
+	/**
+	 * One relationship instance as Orion-LD returns it; the prefixes are empty for compacted sub-attribute names.
+	 */
+	private static String refInstance(String id, String corePrefix, String defaultPrefix, String extraMembers) {
+		return """
+				{"type":"Relationship","object":"%1$s","datasetId":"%1$s",%4$s
+				"%2$sname":{"type":"Property","value":"name-of-%1$s"},
+				"%3$shref":{"type":"Property","value":"%1$s"},
+				"%3$stmfEscaped-@referredType":{"type":"Property","value":"Organization"},
+				"%3$svalidFor":{"type":"Property","value":{"%3$sstartDateTime":"2026-01-01T00:00:00Z","%3$sendDateTime":"2026-12-31T00:00:00Z"}},
+				"%3$sassociationSpec":{"type":"Property","value":{"%3$stmfEscaped-id":"urn:ngsi-ld:spec:%1$s","%3$sname":"spec"}}}
+				""".formatted(id, corePrefix, defaultPrefix, extraMembers);
+	}
+
+	private static MyExpandedRef expectedRef(String id) {
+		MyTimePeriod validFor = new MyTimePeriod();
+		validFor.setStartDateTime("2026-01-01T00:00:00Z");
+		validFor.setEndDateTime("2026-12-31T00:00:00Z");
+		MySubPropertyRefOrValue associationSpec = new MySubPropertyRefOrValue();
+		associationSpec.setId(URI.create("urn:ngsi-ld:spec:" + id));
+		associationSpec.setName("spec");
+		MyExpandedRef ref = new MyExpandedRef(id);
+		ref.setName("name-of-" + id);
+		ref.setHref(URI.create(id));
+		ref.setReferredType("Organization");
+		ref.setValidFor(validFor);
+		ref.setAssociationSpec(associationSpec);
+		return ref;
+	}
+
+	private static Stream<Arguments> relationshipListInstances() {
+		return Stream.of(
+				Arguments.of("compacted",
+						refInstance(REF_1, COMPACT, COMPACT, ""),
+						refInstance(REF_2, COMPACT, COMPACT, "")),
+				Arguments.of("expanded",
+						refInstance(REF_1, CORE_PREFIX, DEFAULT_CONTEXT_PREFIX, ""),
+						refInstance(REF_2, CORE_PREFIX, DEFAULT_CONTEXT_PREFIX, "")),
+				Arguments.of("mixed, the compact name wins over the expanded one",
+						refInstance(REF_1, COMPACT, COMPACT, "\"" + CORE_PREFIX + "name\":{\"type\":\"Property\",\"value\":\"ignored\"},"),
+						refInstance(REF_2, CORE_PREFIX, DEFAULT_CONTEXT_PREFIX, "")));
+	}
+
+	@DisplayName("Relationship-list targets are built from compacted and expanded sub-attribute names alike.")
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("relationshipListInstances")
+	void mapRelationshipListFromExpandedSubAttributes(String description, String firstInstance, String secondInstance) throws JacksonException {
+		when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of()));
+		String parentEntityString = "{\"id\":\"urn:ngsi-ld:complex-pojo:entity\",\"type\":\"complex-pojo\",\"refs\":["
+				+ firstInstance + "," + secondInstance + "]}";
+		EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
+
+		MyPojoWithExpandedRefList expectedPojo = new MyPojoWithExpandedRefList("urn:ngsi-ld:complex-pojo:entity");
+		expectedPojo.setRefs(List.of(expectedRef(REF_1), expectedRef(REF_2)));
+
+		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithExpandedRefList.class).block(),
+				"Both refs should be fully populated from their sub-attributes.");
+		verify(entitiesRepository, never()).getEntities(not(eq(List.<URI>of())));
+	}
+
+	private static Stream<Arguments> nestedSubAttributeValues() {
+		return Stream.of(
+				Arguments.of("expanded nested key is compacted",
+						"{\"" + DEFAULT_CONTEXT_PREFIX + "name\":\"spec\"}"),
+				Arguments.of("compact nested key wins, expanded one listed last",
+						"{\"name\":\"spec\",\"" + DEFAULT_CONTEXT_PREFIX + "name\":\"dropped\"}"),
+				Arguments.of("compact nested key wins, expanded one listed first",
+						"{\"" + DEFAULT_CONTEXT_PREFIX + "name\":\"dropped\",\"name\":\"spec\"}"));
+	}
+
+	@DisplayName("Nested value keys of relationship sub-attributes are compacted even when the sub-attribute names are compact.")
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("nestedSubAttributeValues")
+	void compactNestedKeysUnderCompactSubAttributes(String description, String associationSpecValue) throws JacksonException {
+		when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of()));
+		String instanceTemplate = "{\"type\":\"Relationship\",\"object\":\"%1$s\",\"datasetId\":\"%1$s\","
+				+ "\"associationSpec\":{\"type\":\"Property\",\"value\":%2$s}}";
+		String parentEntityString = "{\"id\":\"urn:ngsi-ld:complex-pojo:entity\",\"type\":\"complex-pojo\",\"refs\":["
+				+ instanceTemplate.formatted(REF_1, associationSpecValue) + ","
+				+ instanceTemplate.formatted(REF_2, associationSpecValue) + "]}";
+		EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
+
+		MySubPropertyRefOrValue associationSpec = new MySubPropertyRefOrValue();
+		associationSpec.setName("spec");
+		MyExpandedRef ref1 = new MyExpandedRef(REF_1);
+		ref1.setAssociationSpec(associationSpec);
+		MyExpandedRef ref2 = new MyExpandedRef(REF_2);
+		ref2.setAssociationSpec(associationSpec);
+		MyPojoWithExpandedRefList expectedPojo = new MyPojoWithExpandedRefList("urn:ngsi-ld:complex-pojo:entity");
+		expectedPojo.setRefs(List.of(ref1, ref2));
+
+		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithExpandedRefList.class).block(),
+				"Nested keys should be compacted, with the compact key winning on a collision.");
+	}
+
+	private static String timePeriodProperty(String prefix, String start) {
+		return "{\"type\":\"Property\",\"value\":{\"%1$sstartDateTime\":\"%2$s\",\"%1$sendDateTime\":\"2026-12-31T00:00:00Z\"}}"
+				.formatted(prefix, start);
+	}
+
+	private static MyTimePeriod timePeriod(String start) {
+		MyTimePeriod timePeriod = new MyTimePeriod();
+		timePeriod.setStartDateTime(start);
+		timePeriod.setEndDateTime("2026-12-31T00:00:00Z");
+		return timePeriod;
+	}
+
+	private static Stream<Arguments> subAttributePropertyLists() {
+		String firstStart = "2026-01-01T00:00:00Z";
+		String secondStart = "2026-06-01T00:00:00Z";
+		return Stream.of(
+				Arguments.of("property list",
+						"[" + timePeriodProperty(DEFAULT_CONTEXT_PREFIX, firstStart) + "," + timePeriodProperty(DEFAULT_CONTEXT_PREFIX, secondStart) + "]",
+						List.of(timePeriod(firstStart), timePeriod(secondStart))),
+				Arguments.of("single-element list returned as a flat property",
+						timePeriodProperty(DEFAULT_CONTEXT_PREFIX, firstStart),
+						List.of(timePeriod(firstStart))));
+	}
+
+	@DisplayName("Property-list sub-attributes of relationship instances get their nested keys compacted per item.")
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("subAttributePropertyLists")
+	void compactNestedKeysInPropertyListSubAttributes(String description, String validPeriods, List<MyTimePeriod> expectedPeriods) throws JacksonException {
+		when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of()));
+		String instanceTemplate = "{\"type\":\"Relationship\",\"object\":\"%1$s\",\"datasetId\":\"%1$s\","
+				+ "\"" + DEFAULT_CONTEXT_PREFIX + "validPeriods\":%2$s}";
+		String parentEntityString = "{\"id\":\"urn:ngsi-ld:complex-pojo:entity\",\"type\":\"complex-pojo\",\"refs\":["
+				+ instanceTemplate.formatted(REF_1, validPeriods) + ","
+				+ instanceTemplate.formatted(REF_2, validPeriods) + "]}";
+		EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
+
+		MyExpandedRef ref1 = new MyExpandedRef(REF_1);
+		ref1.setValidPeriods(expectedPeriods);
+		MyExpandedRef ref2 = new MyExpandedRef(REF_2);
+		ref2.setValidPeriods(expectedPeriods);
+		MyPojoWithExpandedRefList expectedPojo = new MyPojoWithExpandedRefList("urn:ngsi-ld:complex-pojo:entity");
+		expectedPojo.setRefs(List.of(ref1, ref2));
+
+		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithExpandedRefList.class).block(),
+				"Every list item should be mapped from its compacted value keys.");
+	}
+
+	private static Stream<Arguments> relationshipOverrides() {
+		String withName = "{\"id\":\"" + SHARED_SUB_ENTITY + "\",\"type\":\"sub-entity\",\"name\":{\"type\":\"Property\",\"value\":\"fetched\"}}";
+		String withoutAttributes = "{\"id\":\"" + SHARED_SUB_ENTITY + "\",\"type\":\"sub-entity\"}";
+		return Stream.of(
+				Arguments.of("compact override", withName, "name"),
+				Arguments.of("expanded override", withName, CORE_PREFIX + "name"),
+				Arguments.of("override on an entity without attributes", withoutAttributes, CORE_PREFIX + "name"));
+	}
+
+	@DisplayName("Sub-attributes of a relationship override the attributes of the fetched entity.")
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("relationshipOverrides")
+	void overrideFetchedEntityWithRelationshipSubAttributes(String description, String subEntityString, String overrideKey) throws JacksonException {
+		EntityVO subEntity = OBJECT_MAPPER.readValue(subEntityString, EntityVO.class);
+		when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of(subEntity)));
+		String parentEntityString = "{\"id\":\"urn:ngsi-ld:complex-pojo:entity\",\"type\":\"complex-pojo\",\"sub-entity\":{\"type\":\"Relationship\",\"object\":\""
+				+ SHARED_SUB_ENTITY + "\",\"" + overrideKey + "\":{\"type\":\"Property\",\"value\":\"override\"}}}";
+		EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
+
+		MySubPropertyEntity expectedSubEntity = new MySubPropertyEntity(SHARED_SUB_ENTITY);
+		expectedSubEntity.setMyName("override");
+		MyPojoWithSubEntity expectedPojo = new MyPojoWithSubEntity("urn:ngsi-ld:complex-pojo:entity");
+		expectedPojo.setMySubProperty(expectedSubEntity);
+
+		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntity.class).block(),
+				"The override should replace the fetched value.");
+	}
+
+	@DisplayName("An override on one relationship does not leak into another relationship to the same entity.")
+	@Test
+	void overrideDoesNotLeakIntoSharedEntity() throws JacksonException {
+		String subEntityString = "{\"id\":\"" + SHARED_SUB_ENTITY + "\",\"type\":\"sub-entity\",\"name\":{\"type\":\"Property\",\"value\":\"fetched\"}}";
+		EntityVO subEntity = OBJECT_MAPPER.readValue(subEntityString, EntityVO.class);
+		when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of(subEntity)));
+		String parentEntityString = "{\"id\":\"urn:ngsi-ld:complex-pojo:entity\",\"type\":\"complex-pojo\","
+				+ "\"first\":{\"type\":\"Relationship\",\"object\":\"" + SHARED_SUB_ENTITY + "\",\"" + CORE_PREFIX + "name\":{\"type\":\"Property\",\"value\":\"override\"}},"
+				+ "\"second\":{\"type\":\"Relationship\",\"object\":\"" + SHARED_SUB_ENTITY + "\"}}";
+		EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
+
+		MyPojoWithTwoSubEntities mapped = entityVOMapper.fromEntityVO(parentEntity, MyPojoWithTwoSubEntities.class).block();
+
+		assertEquals("override", mapped.getFirst().getMyName(), "The first relationship should carry its override.");
+		assertEquals("fetched", mapped.getSecond().getMyName(), "The second relationship should keep the fetched value.");
+		assertEquals(Set.of("name"), subEntity.getAdditionalProperties().keySet(), "The fetched entity should not get additional keys.");
+		assertEquals("fetched", ((PropertyVO) subEntity.getAdditionalProperties().get("name")).getValue(),
+				"The fetched entity should keep its original value.");
+	}
+
+	@DisplayName("An expanded NGSI-LD meta key on a relationship is not taken for the user sub-attribute of the same name.")
+	@Test
+	void expandedMetaKeyDoesNotShadowUserSubAttribute() throws JacksonException {
+		when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of()));
+		String parentEntityString = "{\"id\":\"urn:ngsi-ld:complex-pojo:entity\",\"type\":\"complex-pojo\","
+				+ "\"mySubProperty\":{\"type\":\"Relationship\",\"object\":\"urn:ngsi-ld:sub-entity:entity\","
+				+ "\"" + CORE_PREFIX + "observedAt\":\"2027-02-02T00:00:00Z\","
+				+ "\"tmfEscaped-observedAt\":{\"type\":\"Property\",\"value\":\"2026-01-01T00:00:00Z\"}}}";
+		EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
+
+		MySubPropertyEntityWithWellKnown expectedSubEntity = new MySubPropertyEntityWithWellKnown("urn:ngsi-ld:sub-entity:entity");
+		expectedSubEntity.setObservedAt(Instant.parse("2026-01-01T00:00:00Z"));
+		MyPojoWithSubEntityWellKnown expectedPojo = new MyPojoWithSubEntityWellKnown("urn:ngsi-ld:complex-pojo:entity");
+		expectedPojo.setMySubProperty(expectedSubEntity);
+
+		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityWellKnown.class).block(),
+				"The escaped user sub-attribute should be used, not the expanded meta key.");
+	}
+
+	@DisplayName("An expanded relationship member is used when the typed member is empty and no user sub-attribute exists.")
+	@Test
+	void expandedMetaKeyFillsEmptyRelationshipMember() throws JacksonException {
+		when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of()));
+		String parentEntityString = "{\"id\":\"urn:ngsi-ld:complex-pojo:entity\",\"type\":\"complex-pojo\","
+				+ "\"mySubProperty\":{\"type\":\"Relationship\",\"object\":\"urn:ngsi-ld:sub-entity:entity\","
+				+ "\"" + CORE_PREFIX + "observedAt\":\"2027-02-02T00:00:00Z\","
+				+ "\"" + CORE_PREFIX + "datasetId\":\"urn:ngsi-ld:dataset:expanded\"}}";
+		EntityVO parentEntity = OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
+
+		MySubPropertyEntityWithWellKnown expectedSubEntity = new MySubPropertyEntityWithWellKnown("urn:ngsi-ld:sub-entity:entity");
+		expectedSubEntity.setObservedAt(Instant.parse("2027-02-02T00:00:00Z"));
+		expectedSubEntity.setDatasetId("urn:ngsi-ld:dataset:expanded");
+		MyPojoWithSubEntityWellKnown expectedPojo = new MyPojoWithSubEntityWellKnown("urn:ngsi-ld:complex-pojo:entity");
+		expectedPojo.setMySubProperty(expectedSubEntity);
+
+		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(parentEntity, MyPojoWithSubEntityWellKnown.class).block(),
+				"The expanded members should fill the empty typed members.");
+	}
+
+	@DisplayName("Expanded keys in top-level property values are returned unchanged.")
+	@Test
+	void keepExpandedKeysInTopLevelValues() throws JacksonException {
+		when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of()));
+		String entityString = "{\"id\":\"urn:ngsi-ld:my-pojo:entity\",\"type\":\"my-pojo\","
+				+ "\"extension\":{\"type\":\"Property\",\"value\":{\"" + CORE_PREFIX + "name\":\"kept\"}}}";
+		EntityVO entityVO = OBJECT_MAPPER.readValue(entityString, EntityVO.class);
+
+		MyPojoWithUnmappedProperties mapped = entityVOMapper.fromEntityVO(entityVO, MyPojoWithUnmappedProperties.class).block();
+
+		assertEquals(List.of(new UnmappedProperty("extension", Map.of(CORE_PREFIX + "name", "kept"))), mapped.getUnmappedProperties(),
+				"Top-level values are user data and should not be compacted.");
 	}
 
 	@DisplayName("If the setter is broken, nothing should be constructed.")
