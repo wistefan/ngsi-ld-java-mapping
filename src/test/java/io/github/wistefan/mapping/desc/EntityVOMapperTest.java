@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -1286,4 +1287,88 @@ class EntityVOMapperTest {
 		notificationParamsProperty.setFormat("keyValues");
 		return notificationParamsProperty;
 	}
+
+	private static final String CUSTOM_CONTEXT_URL = "https://my.org/context.jsonld";
+	private static final String CUSTOM_VOCAB = "https://my.org/vocab/";
+	private static final String VALID_FOR_IRI = "https://my.org/attributes/validFor";
+
+	/**
+	 * Context of a deployment that points Orion-LD's general.contextUrl at its own document: one explicitly defined
+	 * term and a vocabulary everything else is expanded under.
+	 */
+	private static final String CUSTOM_CONTEXT_DOCUMENT =
+			"{\"@context\":{\"@vocab\":\"" + CUSTOM_VOCAB + "\",\"validFor\":\"" + VALID_FOR_IRI + "\"}}";
+
+	/**
+	 * One relationship instance as Orion-LD returns it when it expands against such a context: the terms the context
+	 * defines under their own IRI, everything else under its vocabulary.
+	 */
+	private static String contextExpandedRefInstance(String id) {
+		return """
+				{"type":"Relationship","object":"%1$s","datasetId":"%1$s",
+				"%2$sname":{"type":"Property","value":"name-of-%1$s"},
+				"%2$shref":{"type":"Property","value":"%1$s"},
+				"%2$stmfEscaped-@referredType":{"type":"Property","value":"Organization"},
+				"%3$s":{"type":"Property","value":{"%2$sstartDateTime":"2026-01-01T00:00:00Z","%2$sendDateTime":"2026-12-31T00:00:00Z"}},
+				"%2$sassociationSpec":{"type":"Property","value":{"%2$stmfEscaped-id":"urn:ngsi-ld:spec:%1$s","%2$sname":"spec"}}}
+				""".formatted(id, CUSTOM_VOCAB, VALID_FOR_IRI);
+	}
+
+	private static EntityVO contextExpandedParentEntity() throws JacksonException {
+		String parentEntityString = "{\"id\":\"urn:ngsi-ld:complex-pojo:entity\",\"type\":\"complex-pojo\",\"refs\":["
+				+ contextExpandedRefInstance(REF_1) + "," + contextExpandedRefInstance(REF_2) + "]}";
+		return OBJECT_MAPPER.readValue(parentEntityString, EntityVO.class);
+	}
+
+	/**
+	 * Mapper resolving expanded names against the configured context, with the document served from memory.
+	 */
+	private EntityVOMapper mapperWithCustomContext() {
+		mappingProperties.setContextUrl(CUSTOM_CONTEXT_URL);
+		JsonLdContextLoader contextLoader = url -> CUSTOM_CONTEXT_URL.equals(url)
+				? Optional.of(CUSTOM_CONTEXT_DOCUMENT)
+				: Optional.empty();
+		NgsiLdKeyCompactor keyCompactor = new NgsiLdKeyCompactor(new JsonLdContextResolver(mappingProperties, contextLoader));
+		return new EntityVOMapper(mappingProperties, OBJECT_MAPPER, entitiesRepository, keyCompactor);
+	}
+
+	@DisplayName("Sub-attributes expanded under the configured context are compacted, so a reference list keeps its sub-attributes.")
+	@Test
+	void mapRelationshipListFromContextExpandedSubAttributes() throws JacksonException {
+		when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of()));
+
+		MyPojoWithExpandedRefList expectedPojo = new MyPojoWithExpandedRefList("urn:ngsi-ld:complex-pojo:entity");
+		expectedPojo.setRefs(List.of(expectedRef(REF_1), expectedRef(REF_2)));
+
+		assertEquals(expectedPojo, mapperWithCustomContext().fromEntityVO(contextExpandedParentEntity(), MyPojoWithExpandedRefList.class).block(),
+				"Both refs should be fully populated from their sub-attributes.");
+	}
+
+	@DisplayName("Without a retrievable context the mapping of context-expanded sub-attributes still succeeds, with the ids preserved.")
+	@Test
+	void mapRelationshipListWithoutTheConfiguredContext() throws JacksonException {
+		when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of()));
+
+		MyPojoWithExpandedRefList expectedPojo = new MyPojoWithExpandedRefList("urn:ngsi-ld:complex-pojo:entity");
+		expectedPojo.setRefs(List.of(new MyExpandedRef(REF_1), new MyExpandedRef(REF_2)));
+
+		assertEquals(expectedPojo, entityVOMapper.fromEntityVO(contextExpandedParentEntity(), MyPojoWithExpandedRefList.class).block(),
+				"The mapping should fall back to the ids instead of failing.");
+	}
+
+	@DisplayName("A context that does not cover the expanded names leaves the mapping to the ids.")
+	@Test
+	void mapRelationshipListWithAnUnrelatedContext() throws JacksonException {
+		when(entitiesRepository.getEntities(anyList())).thenReturn(Mono.just(List.of()));
+		NgsiLdKeyCompactor keyCompactor = new NgsiLdKeyCompactor(
+				new JsonLdContext(Map.of("https://other.org/name", "name"), List.of("https://other.org/vocab/")));
+		EntityVOMapper mapper = new EntityVOMapper(mappingProperties, OBJECT_MAPPER, entitiesRepository, keyCompactor);
+
+		MyPojoWithExpandedRefList expectedPojo = new MyPojoWithExpandedRefList("urn:ngsi-ld:complex-pojo:entity");
+		expectedPojo.setRefs(List.of(new MyExpandedRef(REF_1), new MyExpandedRef(REF_2)));
+
+		assertEquals(expectedPojo, mapper.fromEntityVO(contextExpandedParentEntity(), MyPojoWithExpandedRefList.class).block(),
+				"An unrelated context should not change the outcome.");
+	}
+
 }
